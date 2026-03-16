@@ -3,7 +3,8 @@ import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/src/core/services/storage_service.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
+
 import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
 import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
 import 'package:flutter/material.dart';
@@ -111,11 +112,37 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     final licenseData = await KycStorage.getDrivingLicense();
     final bankData = await KycStorage.getBankDetails();
 
-    // Prepare file
+    // Prepare files
     File? drivingLicenseFront;
+    File? drivingLicenseBack;
 
-    if (licenseData != null && licenseData['frontImagePath'] != null) {
-      drivingLicenseFront = File(licenseData['frontImagePath']);
+    if (licenseData != null) {
+      if (licenseData['frontImagePath'] != null) {
+        drivingLicenseFront = File(licenseData['frontImagePath']);
+        if (drivingLicenseFront.existsSync() &&
+            drivingLicenseFront.lengthSync() > 2500000) {
+          setState(() => _isLoading = false);
+          AppSnackbar.showError(
+            title: 'Image Too Large',
+            message:
+                'Your Front image is too large. Please go back to the Driving License step and re-take the photo.',
+          );
+          return;
+        }
+      }
+      if (licenseData['backImagePath'] != null) {
+        drivingLicenseBack = File(licenseData['backImagePath']);
+        if (drivingLicenseBack.existsSync() &&
+            drivingLicenseBack.lengthSync() > 2500000) {
+          setState(() => _isLoading = false);
+          AppSnackbar.showError(
+            title: 'Image Too Large',
+            message:
+                'Your Back image is too large. Please go back to the Driving License step and re-take the photo.',
+          );
+          return;
+        }
+      }
     }
 
     // Call the API
@@ -123,7 +150,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       vehicleType: _vehicles[_selectedVehicleIndex!].title,
       registrationNumber: _registrationController.text.trim(),
       licenseNumber: licenseData?['licenseNumber'] ?? '',
+      dob: licenseData?['dob'] ?? '',
+      expiryDate: licenseData?['expiryDate'] ?? '',
       drivingLicenceFront: drivingLicenseFront,
+      drivingLicenceBack: drivingLicenseBack,
       paymentMode: bankData?['paymentMode'] ?? 'bank',
       accountHolderName: bankData?['accountHolderName'] ?? '',
       accountNumber: bankData?['accountNumber'] ?? '',
@@ -151,11 +181,26 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         message: result['message'] ?? 'Your application is being processed.',
       );
     } else {
-      AppSnackbar.showError(
-        title: 'Submission Failed',
-        message:
-            result['message'] ?? 'Please check your details and try again.',
-      );
+      final message = result['message']?.toString() ?? '';
+      if (message.contains('KYC already approved')) {
+        // Correct the status and move home
+        await StorageService.saveKycStatus('approved');
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
+        AppSnackbar.showSuccess(
+          title: 'Already Verified',
+          message: 'Your account is already verified. Redirecting to home...',
+        );
+      } else {
+        AppSnackbar.showError(
+          title: 'BACKEND REJECTED',
+          message: 'DEV_LOG: ${result.toString()}',
+        );
+      }
     }
   }
 

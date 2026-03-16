@@ -1,9 +1,9 @@
 import 'dart:convert';
+import 'package:care_mall_rider/core/utils/logger_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
-import 'package:care_mall_rider/src/core/utils/logger_service.dart';
-
 class AuthService {
+  
   /// Sends OTP to the provided phone number
   ///
   /// Parameters:
@@ -30,9 +30,7 @@ class AuthService {
           'email': email,
         }),
       );
-
       final responseData = jsonDecode(response.body);
-
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {
           'success': true,
@@ -52,7 +50,6 @@ class AuthService {
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
-
   /// Verifies the OTP entered by the user
   ///
   /// Parameters:
@@ -70,11 +67,8 @@ class AuthService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'phone': phone, 'otp': otp}),
       );
-
       final responseData = jsonDecode(response.body);
-
       Log.debug('[AuthService] verifyOtp raw response: ${response.body}');
-
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Try every common token field name
         final dynamic rawData = responseData['data'] ?? responseData;
@@ -90,11 +84,9 @@ class AuthService {
                     rawData['jwt'] ??
                     rawData['authToken'])
                 ?.toString();
-
         Log.info(
           '[AuthService] Extracted token: ${token != null ? "YES (len=${token.length})" : "NULL — check field name!"}',
         );
-
         return {
           'success': true,
           'message': responseData['message'] ?? 'OTP verified successfully!',
@@ -104,8 +96,7 @@ class AuthService {
       } else {
         return {
           'success': false,
-          'message':
-              responseData['message'] ?? 'Invalid OTP. Please try again.',
+          'message':responseData['message'] ?? 'Invalid OTP. Please try again.',
           'data': responseData,
         };
       }

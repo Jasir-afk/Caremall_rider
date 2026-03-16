@@ -1,7 +1,8 @@
 import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/src/core/services/storage_service.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
+
 import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
 import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
 import 'package:care_mall_rider/src/modules/kyc/view/driving_license_screen.dart';
@@ -30,7 +31,8 @@ class _KycVerificationScreenState extends State<KycVerificationScreen> {
     final localStatus = await StorageService.getKycStatus();
     if (mounted) {
       setState(() => _status = localStatus);
-      if (_status == 'verified' || _status == 'under_review') {
+      final s = _status.toLowerCase();
+      if (s == 'verified' || s == 'under_review' || s == 'approved') {
         _navigateHome();
         return;
       }
@@ -46,7 +48,8 @@ class _KycVerificationScreenState extends State<KycVerificationScreen> {
         _isInitLoading = false;
       });
 
-      if (_status == 'verified' || _status == 'under_review') {
+      final s = _status.toLowerCase();
+      if (s == 'verified' || s == 'under_review' || s == 'approved') {
         _navigateHome();
       }
     }
@@ -234,12 +237,18 @@ class _KycHeader extends StatelessWidget {
     IconData headerIcon = Icons.verified_user_outlined;
     Color headerColor = AppColors.primarycolor;
 
-    if (status == 'under_review') {
+    if (status.toLowerCase() == 'under_review') {
       headerTitle = 'Verification Under Review';
       headerSubtitle = 'We are currently reviewing your documents';
       headerIcon = Icons.query_builder_rounded;
       headerColor = const Color(0xFF1976D2);
-    } else if (status == 'rejected') {
+    } else if (status.toLowerCase() == 'approved' ||
+        status.toLowerCase() == 'verified') {
+      headerTitle = 'Verification Approved';
+      headerSubtitle = 'Your KYC has been successfully verified';
+      headerIcon = Icons.verified_rounded;
+      headerColor = Colors.green;
+    } else if (status.toLowerCase() == 'rejected') {
       headerTitle = 'Action Required';
       headerSubtitle = 'Your KYC was not approved';
       headerIcon = Icons.warning_amber_rounded;

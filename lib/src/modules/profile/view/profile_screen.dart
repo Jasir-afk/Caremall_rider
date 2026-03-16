@@ -1,7 +1,7 @@
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/app/utils/kyc_storage.dart';
-import 'package:care_mall_rider/src/core/services/storage_service.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/src/modules/auth/view/login_screen.dart';
 import 'package:care_mall_rider/src/modules/profile/controller/profile_repo.dart';
 import 'package:care_mall_rider/src/modules/profile/model/profile_model.dart';

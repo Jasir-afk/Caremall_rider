@@ -23,6 +23,10 @@ class ApiUrls {
   static String kycStatus =
       '$baseURL/api/v1/rider/kyc/status'; // GET – get kyc status
 
+  // Common – image upload uses the production CDN server directly
+  static const String uploadImage =
+      'https://api.caremall.in/api/v1/admin/upload/image'; // POST – upload image
+
   // Routes
   static String todayRoute =
       '$baseURL/api/v1/rider/routes/today'; // GET – today's route with ?lat=&lng=
@@ -47,7 +51,7 @@ class ApiUrls {
 
   // Returns
   static String returnsOrders =
-      '$baseURL/api/v1/rider/returns/'; // GET – return orders list
+      '$baseURL/api/v1/rider/returns'; // GET – return orders list
   static String returnDetail(String id) =>
       '$baseURL/api/v1/rider/returns/$id'; // GET – single return order
   static String returnUpdateStatus(String id) =>

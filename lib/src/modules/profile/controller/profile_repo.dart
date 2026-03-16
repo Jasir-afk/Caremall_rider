@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:care_mall_rider/core/services/storage_service.dart';
+import 'package:care_mall_rider/core/utils/logger_service.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
-import 'package:care_mall_rider/src/core/services/storage_service.dart';
+import 'package:care_mall_rider/app/utils/network/upload_repo.dart';
 
 class ProfileRepo {
   /// Fetch rider profile
@@ -60,14 +61,23 @@ class ProfileRepo {
 
     // Avatar
     if (avatar != null) {
-      final ext = avatar.path.split('.').last.toLowerCase();
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'avatar',
-          avatar.path,
-          contentType: MediaType('image', ext == 'png' ? 'png' : 'jpeg'),
-        ),
-      );
+      Log.debug('[ProfileRepo] Uploading avatar image...');
+      final result = await UploadRepo.uploadImage(avatar, authToken: token);
+
+      if (result['success'] == true) {
+        final url = result['url'] as String;
+        Log.debug('[ProfileRepo] Avatar uploaded successfully: $url');
+        request.fields['avatar'] = url;
+      } else {
+        final reason = result['error'] ?? 'Unknown error';
+        Log.error('[ProfileRepo] Avatar upload failed: $reason');
+        return {
+          'success': false,
+          'message':
+              'Could not upload your avatar. '
+              'Please check your connection and try again.',
+        };
+      }
     }
 
     // Payment fields

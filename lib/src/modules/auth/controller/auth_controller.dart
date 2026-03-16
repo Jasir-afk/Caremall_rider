@@ -1,4 +1,4 @@
-import 'package:care_mall_rider/src/core/services/storage_service.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/src/modules/auth/controller/auth_repo.dart';
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:get/get_rx/src/rx_types/rx_types.dart';

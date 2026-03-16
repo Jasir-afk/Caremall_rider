@@ -1,7 +1,7 @@
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
-import 'package:care_mall_rider/src/core/services/storage_service.dart';
 import 'package:care_mall_rider/src/modules/auth/view/login_screen.dart';
 import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
 import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
@@ -11,27 +11,20 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
-
 class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
     _navigate();
   }
-
   Future<void> _navigate() async {
     await Future.delayed(const Duration(seconds: 3));
-
     if (!mounted) return;
-
     final isLoggedIn = await StorageService.isLoggedIn();
-
     if (!mounted) return;
-
     if (!isLoggedIn) {
       // Not logged in → go to Login
       Navigator.pushReplacement(
@@ -41,10 +34,8 @@ class _SplashScreenState extends State<SplashScreen> {
     } else {
       // Proactively fetch latest KYC status from API if logged in
       await KycRepo.getKycStatus();
-
       final kycDone = await StorageService.isKycCompleted();
       if (!mounted) return;
-
       if (kycDone) {
         // Logged in + KYC done (verified or under_review) → go to Home
         Navigator.pushReplacement(
@@ -60,7 +51,6 @@ class _SplashScreenState extends State<SplashScreen> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,7 +67,6 @@ class _SplashScreenState extends State<SplashScreen> {
                 child: Assets.icons.appLogoPng.image(fit: BoxFit.contain),
               ),
               SizedBox(height: 24.h),
-
               // App Title
               AppText(
                 text: 'Care Mall Rider',
@@ -86,7 +75,6 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: AppColors.textnaturalcolor,
               ),
               SizedBox(height: 8.h),
-
               // Tagline
               AppText(
                 text: 'Partner with us to earn',
@@ -95,7 +83,6 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: AppColors.textDefaultSecondarycolor,
               ),
               SizedBox(height: 48.h),
-
               // Loading Indicator
               SizedBox(
                 width: 40.w,

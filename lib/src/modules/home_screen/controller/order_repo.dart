@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
-import 'package:care_mall_rider/src/core/services/storage_service.dart';
+
 import 'package:care_mall_rider/src/modules/home_screen/model/dashboard_model.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/delivery_order_model.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/return_order_model.dart';
@@ -188,15 +189,35 @@ class OrderRepo {
     );
 
     if (response.statusCode == 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      // Try common root keys; fall back to empty list
-      final list =
-          (body['returns'] ??
-                  body['returnOrders'] ??
-                  body['orders'] ??
-                  body['data'] ??
-                  [])
-              as List<dynamic>;
+      final decoded = jsonDecode(response.body);
+      List<dynamic> list = [];
+
+      if (decoded is List) {
+        list = decoded;
+      } else if (decoded is Map) {
+        // 1. Try common keys at top level
+        final topLevelSource =
+            decoded['returns'] ??
+            decoded['returnOrders'] ??
+            decoded['orders'] ??
+            decoded['return'] ??
+            decoded['data'];
+
+        if (topLevelSource is List) {
+          list = topLevelSource;
+        } else if (topLevelSource is Map) {
+          // 2. If 'data' or similar was a map, look inside it
+          final secondarySource =
+              topLevelSource['returns'] ??
+              topLevelSource['orders'] ??
+              topLevelSource['returnOrders'] ??
+              topLevelSource['data'];
+          if (secondarySource is List) {
+            list = secondarySource;
+          }
+        }
+      }
+
       return list
           .map((e) => ReturnOrder.fromJson(e as Map<String, dynamic>))
           .toList();

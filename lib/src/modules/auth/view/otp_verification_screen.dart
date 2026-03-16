@@ -5,12 +5,13 @@ import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/app/utils/network/auth_service.dart';
 import 'package:care_mall_rider/app/utils/spaces.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
 import 'package:care_mall_rider/src/modules/kyc/view/kyc_verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:care_mall_rider/src/core/services/storage_service.dart';
+
 import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
 import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
 
@@ -42,7 +43,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   bool _isResending = false;
   Timer? _timer;
   int _start = 30;
-
   @override
   void initState() {
     super.initState();
@@ -79,7 +79,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   Future<void> _verifyOTP() async {
     // Collect entered OTP (ignore empty boxes — join only filled ones)
     final otp = _otpControllers.map((c) => c.text.trim()).join();
-
     if (otp.length != 6) {
       AppSnackbar.showError(
         title: 'Invalid OTP',
@@ -87,15 +86,12 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       );
       return;
     }
-
     setState(() => _isLoading = true);
-
     try {
       final result = await AuthService.verifyOtp(
         phone: widget.phoneNumber,
         otp: otp,
       );
-
       // ── Always save login state first (before any context use) ────────
       final bool isSuccess = result['success'] == true;
       if (isSuccess) {
@@ -103,7 +99,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         if (token.isNotEmpty) {
           await StorageService.saveAuthToken(token);
         }
-
         // Save user profile data
         final responseData = result['data'] ?? {};
         final userData = responseData['deliveryBoy'] ?? {};
@@ -117,12 +112,17 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           if (userData['phone'] != null) {
             await StorageService.savePhoneNumber(userData['phone'].toString());
           }
+          if (userData['kyc'] != null && userData['kyc']['status'] != null) {
+            await StorageService.saveKycStatus(
+              userData['kyc']['status'].toString(),
+            );
+          } else if (userData['status'] != null) {
+            await StorageService.saveKycStatus(userData['status'].toString());
+          }
         }
       }
       // ──────────────────────────────────────────────────────────────────
-
       if (!mounted) return;
-
       if (isSuccess) {
         if (mounted) {
           AppSnackbar.showSuccess(
@@ -134,7 +134,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           // Check KYC status before navigating
           await KycRepo.getKycStatus();
           final bool isKycDone = await StorageService.isKycCompleted();
-
           if (mounted) {
             Navigator.pushAndRemoveUntil(
               context,
@@ -168,7 +167,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     setState(() {
       _isResending = true;
     });
-
     try {
       final result = await AuthService.sendOtp(
         phone: widget.phoneNumber,

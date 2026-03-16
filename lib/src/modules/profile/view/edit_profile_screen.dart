@@ -2,13 +2,13 @@ import 'dart:io';
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/src/modules/profile/controller/profile_repo.dart';
 import 'package:care_mall_rider/src/modules/profile/model/profile_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:care_mall_rider/src/core/services/storage_service.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 

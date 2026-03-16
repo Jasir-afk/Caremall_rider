@@ -43,7 +43,9 @@ class _DrivingLicenseScreenState extends State<DrivingLicenseScreen> {
   }) async {
     final XFile? picked = await _picker.pickImage(
       source: source,
-      imageQuality: 90,
+      imageQuality: 50, // balanced quality
+      maxWidth: 800, // force resize to reduce payload size massively
+      maxHeight: 800,
     );
     if (picked != null) {
       setState(() {
