@@ -331,28 +331,50 @@ class _OrderCard extends StatelessWidget {
   Color get _statusColor {
     switch (order.orderStatus.toLowerCase()) {
       case 'delivered':
-        return Colors.green;
+      case 'completed':
+      case 'item_received':
+        return const Color(0xFF1E7E4C);
       case 'cancelled':
-        return Colors.red;
+      case 'failed':
+      case 'rejected':
+        return const Color(0xFFDC2626);
+      case 'shipped':
+      case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
+        return const Color(0xFF1A56DB);
       case 'pending':
-        return Colors.orange;
+      case 'requested':
+        return const Color(0xFFE65100);
       default:
-        return Colors.blueGrey;
+        return const Color(0xFF374151);
     }
   }
 
-  String get _statusLabel {
+  Color get _statusBgColor {
     switch (order.orderStatus.toLowerCase()) {
       case 'delivered':
-        return 'Delivered';
+      case 'completed':
+      case 'item_received':
+        return const Color(0xFFE6F4EE);
       case 'cancelled':
-        return 'Cancelled';
+      case 'failed':
+      case 'rejected':
+        return const Color(0xFFFFE3E3);
+      case 'shipped':
+      case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
+        return const Color(0xFFE8F0FE);
       case 'pending':
-        return 'Pending';
+      case 'requested':
+        return const Color(0xFFFFF3E0);
       default:
-        return order.orderStatus;
+        return const Color(0xFFF3F4F6);
     }
   }
+
+  String get _statusLabel => order.orderStatus.replaceAll('_', ' ').toUpperCase();
 
   @override
   Widget build(BuildContext context) {
@@ -390,7 +412,7 @@ class _OrderCard extends StatelessWidget {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                 decoration: BoxDecoration(
-                  color: _statusColor.withValues(alpha: 0.1),
+                  color: _statusBgColor,
                   borderRadius: BorderRadius.circular(20.r),
                 ),
                 child: AppText(

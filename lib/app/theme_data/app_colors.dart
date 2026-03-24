@@ -19,13 +19,13 @@ class AppColors {
   static const Color successMain = Color(0xFF22C55E);
   static const Color warningMain = Color(0xFFFFAB00);
   static const Color errorMain = Color(0xFFFF5630);
-  static const Color bgcolor = Color(0xFFF4F4F4);
+  static const Color bgcolor = Color(0xFFFFFFFF);
   static const Color bgPositiveTertiaryColor = Color(0xFFEBFFEE);
   static const Color black100color = Color(0xFF272727);
   static const Color ratingYellowcolor = Color(0xFFFFA621);
   static const Color border2color = Color(0xFFDFE3E5);
   static const Color primarylight2color = Color(0xFFFEDFDE);
-  static const Color backgroundDefault = Color(0xFFF5F5F5);
+  static const Color backgroundDefault = Color(0xFFFFFFFF);
   static const Color purplecl = Color(0xFFF2EEFF);
   static const Color purpleclprimery = Color(0xFF8E6CEF);
   static const Color bluePrimary = Colors.blueAccent;

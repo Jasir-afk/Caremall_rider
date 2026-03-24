@@ -389,6 +389,7 @@ class OrderRepo {
   static Future<Map<String, dynamic>> updateReturnStatus({
     required String returnId,
     required String status,
+    String? pickupStatus,
   }) async {
     final token = await StorageService.getAuthToken();
 
@@ -399,7 +400,10 @@ class OrderRepo {
         'Accept': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({'status': status}),
+      body: jsonEncode({
+        'status': status,
+        if (pickupStatus != null) 'pickupStatus': pickupStatus,
+      }),
     );
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;

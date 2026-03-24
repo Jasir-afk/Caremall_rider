@@ -53,12 +53,13 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen> {
     }
   }
 
-  Future<void> _updateStatus(String status) async {
+  Future<void> _updateStatus(String status, {String? pickupStatus}) async {
     setState(() => _updatingStatus = true);
     try {
       final result = await OrderRepo.updateReturnStatus(
         returnId: widget.returnOrder.id,
         status: status,
+        pickupStatus: pickupStatus,
       );
       if (mounted) {
         if (result['success'] == true) {
@@ -383,7 +384,12 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen> {
             ? null
             : (nextStatus == null
                   ? _uploadPhoto
-                  : () => _updateStatus(nextStatus!)),
+                  : () => _updateStatus(
+                      nextStatus!,
+                      pickupStatus: nextStatus == 'item_picked'
+                          ? 'item_picked'
+                          : null,
+                    )),
         btncolor: AppColors.primarycolor,
         borderRadius: 8.r,
         buttonStyle: ButtonStyle(
@@ -422,16 +428,64 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3E0),
+        color: _statusBadgeBg(status),
         borderRadius: BorderRadius.circular(6.r),
       ),
       child: AppText(
         text: status.replaceAll('_', ' ').toUpperCase(),
         fontSize: 12.sp,
         fontWeight: FontWeight.w600,
-        color: const Color(0xFFE65100),
+        color: _statusBadgeFg(status),
       ),
     );
+  }
+
+  Color _statusBadgeBg(String status) {
+    switch (status.toLowerCase()) {
+      case 'delivered':
+      case 'completed':
+      case 'refund_completed':
+      case 'item_received':
+        return const Color(0xFFE6F4EE);
+      case 'cancelled':
+      case 'failed':
+      case 'rejected':
+        return const Color(0xFFFFE3E3);
+      case 'shipped':
+      case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
+        return const Color(0xFFE8F0FE);
+      case 'pending':
+      case 'requested':
+        return const Color(0xFFFFF3E0);
+      default:
+        return const Color(0xFFF3F4F6);
+    }
+  }
+
+  Color _statusBadgeFg(String status) {
+    switch (status.toLowerCase()) {
+      case 'delivered':
+      case 'completed':
+      case 'refund_completed':
+      case 'item_received':
+        return const Color(0xFF1E7E4C);
+      case 'cancelled':
+      case 'failed':
+      case 'rejected':
+        return const Color(0xFFDC2626);
+      case 'shipped':
+      case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
+        return const Color(0xFF1A56DB);
+      case 'pending':
+      case 'requested':
+        return const Color(0xFFE65100);
+      default:
+        return const Color(0xFF374151);
+    }
   }
 
   Widget _buildCard({required Widget child}) {

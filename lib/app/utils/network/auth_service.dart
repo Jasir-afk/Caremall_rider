@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:care_mall_rider/core/utils/logger_service.dart';
+import 'package:care_mall_rider/app/utils/network/logger_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
 class AuthService {

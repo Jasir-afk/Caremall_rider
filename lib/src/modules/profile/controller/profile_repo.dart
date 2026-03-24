@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:care_mall_rider/core/services/storage_service.dart';
-import 'package:care_mall_rider/core/utils/logger_service.dart';
+import 'package:care_mall_rider/app/utils/network/logger_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
 import 'package:care_mall_rider/app/utils/network/upload_repo.dart';
@@ -49,21 +49,17 @@ class ProfileRepo {
       'PATCH',
       Uri.parse(ApiUrls.updateProfile),
     );
-
     if (token != null) {
       request.headers['Authorization'] = 'Bearer $token';
     }
     request.headers['Accept'] = 'application/json';
-
     // Basic fields
     if (name != null) request.fields['name'] = name;
     if (email != null) request.fields['email'] = email;
-
     // Avatar
     if (avatar != null) {
       Log.debug('[ProfileRepo] Uploading avatar image...');
       final result = await UploadRepo.uploadImage(avatar, authToken: token);
-
       if (result['success'] == true) {
         final url = result['url'] as String;
         Log.debug('[ProfileRepo] Avatar uploaded successfully: $url');
@@ -79,7 +75,6 @@ class ProfileRepo {
         };
       }
     }
-
     // Payment fields
     if (paymentMode != null) request.fields['paymentMode'] = paymentMode;
     if (accountHolderName != null) {
@@ -90,7 +85,6 @@ class ProfileRepo {
     if (bankName != null) request.fields['bankName'] = bankName;
     if (upiId != null) request.fields['upiId'] = upiId;
     if (upiNumber != null) request.fields['upiNumber'] = upiNumber;
-
     // Vehicle fields
     if (vehicleType != null) request.fields['vehicleType'] = vehicleType;
     if (registrationNumber != null) {
@@ -99,11 +93,9 @@ class ProfileRepo {
     if (removeAvatar) {
       request.fields['removeAvatar'] = 'true';
     }
-
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
-
     if (response.statusCode == 200 || response.statusCode == 201) {
       return {'success': true, 'data': body};
     } else {

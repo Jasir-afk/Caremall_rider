@@ -1,4 +1,4 @@
-import 'package:care_mall_rider/core/utils/logger_service.dart';
+import 'package:care_mall_rider/app/utils/network/logger_service.dart';
 import 'package:get/get.dart';
 import 'package:care_mall_rider/src/modules/wallet/controller/wallet_repo.dart';
 import 'package:care_mall_rider/src/modules/wallet/model/wallet_model.dart';

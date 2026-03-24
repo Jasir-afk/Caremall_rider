@@ -196,7 +196,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ─── Dashboard Stats (Now state-based) ───────────────────────────────────
-
   // _selectedTab: 0=New 1=InTransit 2=Return 3=History
   bool get _isReturnTab => _selectedTab == 2;
 
@@ -800,14 +799,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       vertical: 4.h,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF3E0),
+                      color: _statusBadgeBg(ret.orderStatus),
                       borderRadius: BorderRadius.circular(4.r),
                     ),
                     child: AppText(
                       text: ret.orderStatus.replaceAll('_', ' ').toUpperCase(),
                       fontSize: 11.sp,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFFE65100),
+                      color: _statusBadgeFg(ret.orderStatus),
                     ),
                   ),
                 ],
@@ -1096,13 +1095,22 @@ class _HomeScreenState extends State<HomeScreen> {
   Color _statusBadgeBg(String status) {
     switch (status.toLowerCase()) {
       case 'delivered':
+      case 'completed':
+      case 'refund_completed':
+      case 'item_received':
         return const Color(0xFFE6F4EE);
       case 'cancelled':
       case 'failed':
+      case 'rejected':
         return const Color(0xFFFFE3E3);
       case 'shipped':
       case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
         return const Color(0xFFE8F0FE);
+      case 'pending':
+      case 'requested':
+        return const Color(0xFFFFF3E0);
       default:
         return const Color(0xFFF3F4F6);
     }
@@ -1111,13 +1119,22 @@ class _HomeScreenState extends State<HomeScreen> {
   Color _statusBadgeFg(String status) {
     switch (status.toLowerCase()) {
       case 'delivered':
+      case 'completed':
+      case 'refund_completed':
+      case 'item_received':
         return const Color(0xFF1E7E4C);
       case 'cancelled':
       case 'failed':
-        return Colors.red;
+      case 'rejected':
+        return const Color(0xFFDC2626);
       case 'shipped':
       case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
         return const Color(0xFF1A56DB);
+      case 'pending':
+      case 'requested':
+        return const Color(0xFFE65100);
       default:
         return const Color(0xFF374151);
     }

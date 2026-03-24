@@ -484,41 +484,69 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   // ── Status Badge ───────────────────────────────────────────────────────────
 
   Widget _buildStatusBadge(String status) {
-    Color bg;
-    Color fg;
-    switch (status.toLowerCase()) {
-      case 'delivered':
-        bg = const Color(0xFFE6F4EE);
-        fg = const Color(0xFF1E7E4C);
-        break;
-      case 'cancelled':
-      case 'failed':
-        bg = const Color(0xFFFFE3E3);
-        fg = Colors.red;
-        break;
-      case 'out_for_delivery':
-      case 'shipped':
-      case 'dispatched':
-        bg = const Color(0xFFE8F0FE);
-        fg = const Color(0xFF1A56DB);
-        break;
-      default:
-        bg = const Color(0xFFFFF3E0);
-        fg = const Color(0xFFE65100);
-    }
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
       decoration: BoxDecoration(
-        color: bg,
+        color: _statusBadgeBg(status),
         borderRadius: BorderRadius.circular(20.r),
       ),
       child: AppText(
         text: status.replaceAll('_', ' ').toUpperCase(),
         fontSize: 11.sp,
         fontWeight: FontWeight.w700,
-        color: fg,
+        color: _statusBadgeFg(status),
       ),
     );
+  }
+
+  Color _statusBadgeBg(String status) {
+    switch (status.toLowerCase()) {
+      case 'delivered':
+      case 'completed':
+      case 'refund_completed':
+      case 'item_received':
+        return const Color(0xFFE6F4EE);
+      case 'cancelled':
+      case 'failed':
+      case 'rejected':
+        return const Color(0xFFFFE3E3);
+      case 'shipped':
+      case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
+      case 'dispatched':
+        return const Color(0xFFE8F0FE);
+      case 'pending':
+      case 'requested':
+        return const Color(0xFFFFF3E0);
+      default:
+        return const Color(0xFFF3F4F6);
+    }
+  }
+
+  Color _statusBadgeFg(String status) {
+    switch (status.toLowerCase()) {
+      case 'delivered':
+      case 'completed':
+      case 'refund_completed':
+      case 'item_received':
+        return const Color(0xFF1E7E4C);
+      case 'cancelled':
+      case 'failed':
+      case 'rejected':
+        return const Color(0xFFDC2626);
+      case 'shipped':
+      case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
+      case 'dispatched':
+        return const Color(0xFF1A56DB);
+      case 'pending':
+      case 'requested':
+        return const Color(0xFFE65100);
+      default:
+        return const Color(0xFF374151);
+    }
   }
 
   // ── Customer Card ──────────────────────────────────────────────────────────
