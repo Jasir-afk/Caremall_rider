@@ -516,7 +516,7 @@ class _OrderCard extends StatelessWidget {
               ),
 
               AppText(
-                text: '₹ ${order.finalAmount.toStringAsFixed(0)}',
+                text: '₹ ${order.amountToCollect.toStringAsFixed(0)}',
                 fontSize: 15.sp,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textnaturalcolor,

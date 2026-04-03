@@ -90,6 +90,10 @@ class DeliveryOrder {
 
   /// Is this order active (either New or In Transit)?
   bool get isActive => isInNewStatus || isInTransitStatus;
+
+  /// The amount that actually needs to be collected.
+  /// If COD, add a 40 rupees charge.
+  double get amountToCollect => isCod ? totalAmount + 40 : totalAmount;
 }
 
 class OrderItem {

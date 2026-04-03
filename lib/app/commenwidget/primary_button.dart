@@ -32,13 +32,17 @@ class PrimaryButton extends StatelessWidget {
       height: height ?? 52.h,
       child: MaterialButton(
         onPressed: isLoading ? null : onPressed,
-        color: isOutline ? Colors.transparent : (color ?? AppColors.primarycolor),
+        color: isOutline
+            ? Colors.transparent
+            : (color ?? AppColors.primarycolor),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12.r),
-          side: isOutline ? BorderSide(color: color ?? AppColors.primarycolor, width: 1.5) : BorderSide.none,
+          side: isOutline
+              ? BorderSide(color: color ?? AppColors.primarycolor, width: 1.5)
+              : BorderSide.none,
         ),
-        disabledColor: (color ?? AppColors.primarycolor).withOpacity(0.5),
+        disabledColor: (color ?? AppColors.primarycolor).withValues(alpha: 0.5),
         child: isLoading
             ? const SizedBox(
                 width: 24,
@@ -51,7 +55,9 @@ class PrimaryButton extends StatelessWidget {
             : Text(
                 text,
                 style: TextStyle(
-                  color: isOutline ? (textColor ?? AppColors.primarycolor) : (textColor ?? Colors.white),
+                  color: isOutline
+                      ? (textColor ?? AppColors.primarycolor)
+                      : (textColor ?? Colors.white),
                   fontSize: 16.sp,
                   fontWeight: FontWeight.w600,
                 ),

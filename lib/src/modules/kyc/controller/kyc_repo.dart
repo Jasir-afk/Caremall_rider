@@ -95,9 +95,8 @@ class KycRepo {
         'licenseNumber': licenseNumber,
         if (dob.isNotEmpty) 'dob': dob,
         if (expiryDate.isNotEmpty) 'expiryDate': expiryDate,
-        if (drivingLicenceUrl != null) 'drivingLicenceFront': drivingLicenceUrl,
-        if (drivingLicenceBackUrl != null)
-          'drivingLicenceBack': drivingLicenceBackUrl,
+        'drivingLicenceFront': ?drivingLicenceUrl,
+        'drivingLicenceBack': ?drivingLicenceBackUrl,
         'paymentMode': paymentMode,
         'accountHolderName': accountHolderName,
         'accountNumber': accountNumber,

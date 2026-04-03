@@ -30,6 +30,7 @@ class ProfileRepo {
     // Basic
     String? name,
     String? email,
+    String? address,
     File? avatar,
     // Payment
     String? paymentMode,
@@ -56,6 +57,7 @@ class ProfileRepo {
     // Basic fields
     if (name != null) request.fields['name'] = name;
     if (email != null) request.fields['email'] = email;
+    if (address != null) request.fields['address'] = address;
     // Avatar
     if (avatar != null) {
       Log.debug('[ProfileRepo] Uploading avatar image...');

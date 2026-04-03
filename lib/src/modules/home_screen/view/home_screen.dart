@@ -9,7 +9,6 @@ import 'package:care_mall_rider/src/modules/home_screen/view/delivered_today_scr
 import 'package:care_mall_rider/src/modules/home_screen/view/order_details_screen.dart';
 import 'package:care_mall_rider/src/modules/home_screen/view/route_screen.dart';
 import 'package:care_mall_rider/src/modules/profile/view/profile_screen.dart';
-
 import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/delivery_order_model.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/return_order_model.dart';
@@ -29,16 +28,13 @@ class _HomeScreenState extends State<HomeScreen> {
   // 0: New, 1: In Transit, 2: History
   int _selectedTab = 0;
   String _userName = 'Rider';
-
-  // ── API state ────────────────────────────────────────────────────────────
+  // ── API state ───────────
   List<DeliveryOrder> _allOrders = [];
   bool _ordersLoading = true;
   String? _ordersError;
-
   List<ReturnOrder> _returnOrders = [];
   bool _returnsLoading = true;
   String? _returnsError;
-
   // Dashboard stats from API
   double _totalCodToday = 0.0;
   int _totalDeliveredToday = 0;
@@ -142,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 date.day == now.day) {
               localDelivered++;
               if (o.isCod) {
-                localCod += o.totalAmount;
+                localCod += o.amountToCollect;
               }
             }
           }
@@ -155,6 +151,29 @@ class _HomeScreenState extends State<HomeScreen> {
         if (localCod > _totalCodToday) {
           _totalCodToday = localCod;
         }
+
+        // --- Merge Refund Requested Delivery Orders into Returns ---
+        final refundRequestedFromDelivery = _allOrders
+            .where((o) {
+              final s = o.orderStatus.toLowerCase();
+              return s == 'refund_requested' ||
+                  s == 'refund requested' ||
+                  s == 'refund_request' ||
+                  s == 'refund request' ||
+                  s == 'return_requested' ||
+                  s == 'return requested' ||
+                  s == 'return_request' ||
+                  s == 'return request';
+            })
+            .map((o) => ReturnOrder.fromDeliveryOrder(o))
+            .toList();
+
+        // Avoid adding duplicates if they already exist in _returnOrders
+        for (final r in refundRequestedFromDelivery) {
+          if (!_returnOrders.any((existing) => existing.id == r.id)) {
+            _returnOrders.add(r);
+          }
+        }
       });
     }
   }
@@ -166,9 +185,17 @@ class _HomeScreenState extends State<HomeScreen> {
     'processing',
     'dispatched',
     'assigned',
+    'accepted',
+    'new',
   };
-  static const _transitStatuses = {'shipped', 'out_for_delivery'};
-  static const _historyStatuses = {'delivered', 'failed'};
+  static const _transitStatuses = {'shipped', 'out_for_delivery', 'picked_up'};
+  static const _historyStatuses = {
+    'delivered',
+    'failed',
+    'cancelled',
+    'completed',
+    'refund_completed',
+  };
 
   List<DeliveryOrder> get _newOrders => _allOrders
       .where((o) => _newStatuses.contains(o.orderStatus.toLowerCase()))
@@ -578,7 +605,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         AppText(
-                          text: '₹ ${order.totalAmount.toStringAsFixed(2)}',
+                          text: '₹ ${order.amountToCollect.toStringAsFixed(2)}',
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textnaturalcolor,
@@ -753,138 +780,210 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildReturnCard(ReturnOrder ret) {
-    return GestureDetector(
-      onTap: () async {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ReturnDetailsScreen(returnOrder: ret),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        );
-        if (result == true && mounted) {
-          _fetchOrders();
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: Colors.grey[200]!),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: AppText(
-                      text: 'Return #${ret.returnId}',
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textnaturalcolor,
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8.w,
-                      vertical: 4.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusBadgeBg(ret.orderStatus),
-                      borderRadius: BorderRadius.circular(4.r),
-                    ),
-                    child: AppText(
-                      text: ret.orderStatus.replaceAll('_', ' ').toUpperCase(),
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w600,
-                      color: _statusBadgeFg(ret.orderStatus),
-                    ),
-                  ),
-                ],
-              ),
-              if (ret.customerName != null) ...[
-                SizedBox(height: 8.h),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.person_outline,
-                      size: 14.sp,
-                      color: Colors.grey[500],
-                    ),
-                    SizedBox(width: 6.w),
-                    Expanded(
-                      child: AppText(
-                        text: ret.customerName!,
-                        fontSize: 13.sp,
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 6.w,
+                          vertical: 2.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: ret.returnType?.toLowerCase() == 'replacement'
+                              ? AppColors.warningMain.withValues(alpha: 0.1)
+                              : Colors.blue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              ret.returnType?.toLowerCase() == 'replacement'
+                                  ? Icons.sync
+                                  : Icons.assignment_return_outlined,
+                              size: 10.sp,
+                              color:
+                                  ret.returnType?.toLowerCase() == 'replacement'
+                                  ? AppColors.warningMain
+                                  : Colors.blue,
+                            ),
+                            SizedBox(width: 4.w),
+                            AppText(
+                              text:
+                                  (ret.returnType?.toLowerCase() ==
+                                              'replacement'
+                                          ? 'replacement'
+                                          : 'refund')
+                                      .toUpperCase(),
+                              fontSize: 9.sp,
+                              fontWeight: FontWeight.w800,
+                              color:
+                                  ret.returnType?.toLowerCase() == 'replacement'
+                                  ? AppColors.warningMain
+                                  : Colors.blue,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      AppText(
+                        text: '#${ret.returnId}',
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
                         color: AppColors.textnaturalcolor,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: _statusBadgeBg(ret.orderStatus),
+                    borderRadius: BorderRadius.circular(4.r),
+                  ),
+                  child: AppText(
+                    text: ret.orderStatus.replaceAll('_', ' ').toUpperCase(),
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w600,
+                    color: _statusBadgeFg(ret.orderStatus),
+                  ),
                 ),
               ],
-              if (ret.address != null) ...[
-                SizedBox(height: 4.h),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 14.sp,
-                      color: Colors.grey[500],
-                    ),
-                    SizedBox(width: 6.w),
-                    Expanded(
-                      child: AppText(
-                        text: ret.address!,
-                        fontSize: 12.sp,
-                        color: Colors.grey[600]!,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              if (ret.reason != null) ...[
-                SizedBox(height: 4.h),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 14.sp,
-                      color: Colors.grey[500],
-                    ),
-                    SizedBox(width: 6.w),
-                    Expanded(
-                      child: AppText(
-                        text: 'Reason: ${ret.reason}',
-                        fontSize: 12.sp,
-                        color: Colors.grey[600]!,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              SizedBox(height: 12.h),
+            ),
+            if (ret.customerName != null) ...[
+              SizedBox(height: 8.h),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  AppText(
-                    text: '₹ ${ret.totalAmount.toStringAsFixed(0)}',
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textnaturalcolor,
+                  Icon(
+                    Icons.person_outline,
+                    size: 14.sp,
+                    color: Colors.grey[500],
+                  ),
+                  SizedBox(width: 6.w),
+                  Expanded(
+                    child: AppText(
+                      text: ret.customerName!,
+                      fontSize: 13.sp,
+                      color: AppColors.textnaturalcolor,
+                    ),
                   ),
                 ],
               ),
             ],
-          ),
+            if (ret.address != null) ...[
+              SizedBox(height: 4.h),
+              Row(
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 14.sp,
+                    color: Colors.grey[500],
+                  ),
+                  SizedBox(width: 6.w),
+                  Expanded(
+                    child: AppText(
+                      text: ret.address!,
+                      fontSize: 12.sp,
+                      color: Colors.grey[600]!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (ret.reason != null) ...[
+              SizedBox(height: 4.h),
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 14.sp,
+                    color: Colors.grey[500],
+                  ),
+                  SizedBox(width: 6.w),
+                  Expanded(
+                    child: AppText(
+                      text: 'Reason: ${ret.reason}',
+                      fontSize: 12.sp,
+                      color: Colors.grey[600]!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            SizedBox(height: 12.h),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                AppText(
+                  text: '₹ ${ret.totalAmount.toStringAsFixed(0)}',
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textnaturalcolor,
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: SizedBox(
+                    height: 36.h,
+                    child: AppButton(
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ReturnDetailsScreen(returnOrder: ret),
+                          ),
+                        );
+                        if (result == true && mounted) {
+                          _fetchOrders();
+                        }
+                      },
+                      btncolor: AppColors.primarycolor,
+                      borderRadius: 6.r,
+                      buttonStyle: ButtonStyle(
+                        backgroundColor: WidgetStateProperty.all(
+                          AppColors.primarycolor,
+                        ),
+                        shape: WidgetStateProperty.all(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6.r),
+                          ),
+                        ),
+                      ),
+                      child: AppText(
+                        text: ret.returnType?.toLowerCase() == 'replacement'
+                            ? 'Start Replacement'
+                            : 'Start Refund',
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -941,40 +1040,75 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: 8.h),
 
-            // Destination
-            if (order.dispatch?.destination != null) ...[
+            // Pickup section
+            if (order.dispatch?.destination != null &&
+                order.orderStatus.toLowerCase() != 'delivered') ...[
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    Icons.location_on_outlined,
+                    Icons.store_outlined,
                     size: 14.sp,
-                    color: Colors.grey[500],
+                    color: const Color(0xFF6366F1),
                   ),
-                  SizedBox(width: 4.w),
+                  SizedBox(width: 8.w),
                   Expanded(
-                    child: AppText(
-                      text: order.dispatch!.destination,
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textDefaultSecondarycolor,
-                      maxLines: 1,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText(
+                          text: 'PICKUP FROM',
+                          fontSize: 9.sp,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF6366F1),
+                        ),
+                        SizedBox(height: 2.h),
+                        AppText(
+                          text: order.dispatch!.destination,
+                          fontSize: 12.sp,
+                          color: AppColors.textnaturalcolor,
+                          maxLines: 1,
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: 8.h),
+              SizedBox(height: 12.h),
             ],
 
-            Divider(height: 1.h, thickness: 1, color: Colors.grey[200]),
-            SizedBox(height: 8.h),
-
-            // Delivery address
-            AppText(
-              text: order.fullAddress,
-              fontSize: 13.sp,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textDefaultSecondarycolor,
-              maxLines: 2,
+            // Delivery section
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.person_pin_circle_outlined,
+                  size: 14.sp,
+                  color: AppColors.primarycolor,
+                ),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppText(
+                        text: 'DELIVER TO',
+                        fontSize: 9.sp,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primarycolor,
+                      ),
+                      SizedBox(height: 2.h),
+                      AppText(
+                        text: order.fullAddress,
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textnaturalcolor,
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 16.h),
 
@@ -994,7 +1128,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       SizedBox(height: 2.h),
                       AppText(
-                        text: '₹ ${order.totalAmount.toStringAsFixed(0)}',
+                        text: '₹ ${order.amountToCollect.toStringAsFixed(0)}',
                         fontSize: 16.sp,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textnaturalcolor,
@@ -1110,6 +1244,14 @@ class _HomeScreenState extends State<HomeScreen> {
         return const Color(0xFFE8F0FE);
       case 'pending':
       case 'requested':
+      case 'refund_requested':
+      case 'refund requested':
+      case 'refund_request':
+      case 'refund request':
+      case 'return_requested':
+      case 'return requested':
+      case 'return_request':
+      case 'return request':
         return const Color(0xFFFFF3E0);
       default:
         return const Color(0xFFF3F4F6);
@@ -1134,6 +1276,14 @@ class _HomeScreenState extends State<HomeScreen> {
         return const Color(0xFF1A56DB);
       case 'pending':
       case 'requested':
+      case 'refund_requested':
+      case 'refund requested':
+      case 'refund_request':
+      case 'refund request':
+      case 'return_requested':
+      case 'return requested':
+      case 'return_request':
+      case 'return request':
         return const Color(0xFFE65100);
       default:
         return const Color(0xFF374151);

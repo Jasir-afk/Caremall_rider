@@ -4,6 +4,7 @@ class RiderProfile {
   final String phone;
   final String email;
   final String avatar;
+  final String address;
   final String status;
   final String kycStatus;
   // Vehicle
@@ -23,6 +24,7 @@ class RiderProfile {
     required this.name,
     required this.phone,
     required this.email,
+    required this.address,
     required this.avatar,
     required this.status,
     required this.kycStatus,
@@ -46,6 +48,7 @@ class RiderProfile {
       name: json['name']?.toString() ?? 'Rider',
       phone: json['phone']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
+      address: json['address']?.toString() ?? '',
       avatar: json['avatar']?.toString() ?? '',
       status: json['status']?.toString() ?? 'active',
       kycStatus: kyc['status']?.toString() ?? '-',

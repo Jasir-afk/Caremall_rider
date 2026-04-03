@@ -16,9 +16,7 @@ class OrderDetailsScreen extends StatefulWidget {
   /// The order as fetched from the list. The screen will re-fetch the full
   /// detail (including items) using [order.id] on load.
   final DeliveryOrder order;
-
   const OrderDetailsScreen({super.key, required this.order});
-
   @override
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
 }
@@ -456,11 +454,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 SizedBox(height: 16.h),
 
                 // ── Payment Details ───────────────────────────────────────
-                _buildPaymentCard(isCod, order.totalAmount),
+                _buildPaymentCard(isCod, order),
                 SizedBox(height: 16.h),
 
                 // ── Dispatch Details ──────────────────────────────────────
-                if (order.dispatch != null) ...[
+                if (order.dispatch != null &&
+                    order.orderStatus.toLowerCase() != 'delivered') ...[
                   _buildDispatchCard(order.dispatch!),
                   SizedBox(height: 16.h),
                 ],
@@ -604,7 +603,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   // ── Payment Card ───────────────────────────────────────────────────────────
 
-  Widget _buildPaymentCard(bool isCod, double totalAmount) {
+  Widget _buildPaymentCard(bool isCod, DeliveryOrder order) {
     return _buildCard(
       child: Column(
         children: [
@@ -643,6 +642,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             SizedBox(height: 12.h),
             Divider(color: Colors.grey[200]),
             SizedBox(height: 12.h),
+            if (_display.orderStatus.toLowerCase() != 'delivered') ...[
+              _detailRow(
+                'Order Total',
+                '₹ ${order.totalAmount.toStringAsFixed(0)}',
+              ),
+              SizedBox(height: 8.h),
+              _detailRow('COD Charge', '₹ 40'),
+              SizedBox(height: 12.h),
+              Divider(color: Colors.grey[200]),
+              SizedBox(height: 12.h),
+            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -654,9 +664,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   color: Colors.grey[600]!,
                 ),
                 AppText(
-                  text: '₹ ${totalAmount.toStringAsFixed(0)}',
+                  text: '₹ ${order.amountToCollect.toStringAsFixed(0)}',
                   fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: _display.orderStatus.toLowerCase() == 'delivered'
                       ? AppColors.textPositiveSecondarycolor
                       : AppColors.ratingYellowcolor,
@@ -664,7 +674,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ],
             ),
             SizedBox(height: 12.h),
-            if (_display.orderStatus.toLowerCase() != 'delivered') ...[
+            if (_display.isInTransitStatus) ...[
               Divider(color: Colors.grey[200]),
               SizedBox(height: 12.h),
               Row(

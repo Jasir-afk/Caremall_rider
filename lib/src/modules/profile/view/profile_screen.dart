@@ -178,6 +178,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           'Email',
                           profile.email.isEmpty ? '—' : profile.email,
                         ),
+                        _RowData(
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 16,
+                            color: AppColors.primarycolor,
+                          ),
+                          'Address',
+                          profile.address.isEmpty ? '—' : profile.address,
+                        ),
                       ],
                     ),
                     SizedBox(height: 20.h),
