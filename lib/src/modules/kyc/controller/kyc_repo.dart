@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:care_mall_rider/core/services/storage_service.dart';
-import 'package:care_mall_rider/core/utils/logger_service.dart';
+import 'package:care_mall_rider/app/utils/network/logger_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
 import 'package:care_mall_rider/app/utils/network/upload_repo.dart';
@@ -95,9 +95,8 @@ class KycRepo {
         'licenseNumber': licenseNumber,
         if (dob.isNotEmpty) 'dob': dob,
         if (expiryDate.isNotEmpty) 'expiryDate': expiryDate,
-        if (drivingLicenceUrl != null) 'drivingLicenceFront': drivingLicenceUrl,
-        if (drivingLicenceBackUrl != null)
-          'drivingLicenceBack': drivingLicenceBackUrl,
+        'drivingLicenceFront': ?drivingLicenceUrl,
+        'drivingLicenceBack': ?drivingLicenceBackUrl,
         'paymentMode': paymentMode,
         'accountHolderName': accountHolderName,
         'accountNumber': accountNumber,

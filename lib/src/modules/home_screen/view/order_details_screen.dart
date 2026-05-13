@@ -16,9 +16,7 @@ class OrderDetailsScreen extends StatefulWidget {
   /// The order as fetched from the list. The screen will re-fetch the full
   /// detail (including items) using [order.id] on load.
   final DeliveryOrder order;
-
   const OrderDetailsScreen({super.key, required this.order});
-
   @override
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
 }
@@ -456,11 +454,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 SizedBox(height: 16.h),
 
                 // ── Payment Details ───────────────────────────────────────
-                _buildPaymentCard(isCod, order.totalAmount),
+                _buildPaymentCard(isCod, order),
                 SizedBox(height: 16.h),
 
                 // ── Dispatch Details ──────────────────────────────────────
-                if (order.dispatch != null) ...[
+                if (order.dispatch != null &&
+                    order.orderStatus.toLowerCase() != 'delivered') ...[
                   _buildDispatchCard(order.dispatch!),
                   SizedBox(height: 16.h),
                 ],
@@ -484,41 +483,69 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   // ── Status Badge ───────────────────────────────────────────────────────────
 
   Widget _buildStatusBadge(String status) {
-    Color bg;
-    Color fg;
-    switch (status.toLowerCase()) {
-      case 'delivered':
-        bg = const Color(0xFFE6F4EE);
-        fg = const Color(0xFF1E7E4C);
-        break;
-      case 'cancelled':
-      case 'failed':
-        bg = const Color(0xFFFFE3E3);
-        fg = Colors.red;
-        break;
-      case 'out_for_delivery':
-      case 'shipped':
-      case 'dispatched':
-        bg = const Color(0xFFE8F0FE);
-        fg = const Color(0xFF1A56DB);
-        break;
-      default:
-        bg = const Color(0xFFFFF3E0);
-        fg = const Color(0xFFE65100);
-    }
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
       decoration: BoxDecoration(
-        color: bg,
+        color: _statusBadgeBg(status),
         borderRadius: BorderRadius.circular(20.r),
       ),
       child: AppText(
         text: status.replaceAll('_', ' ').toUpperCase(),
         fontSize: 11.sp,
         fontWeight: FontWeight.w700,
-        color: fg,
+        color: _statusBadgeFg(status),
       ),
     );
+  }
+
+  Color _statusBadgeBg(String status) {
+    switch (status.toLowerCase()) {
+      case 'delivered':
+      case 'completed':
+      case 'refund_completed':
+      case 'item_received':
+        return const Color(0xFFE6F4EE);
+      case 'cancelled':
+      case 'failed':
+      case 'rejected':
+        return const Color(0xFFFFE3E3);
+      case 'shipped':
+      case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
+      case 'dispatched':
+        return const Color(0xFFE8F0FE);
+      case 'pending':
+      case 'requested':
+        return const Color(0xFFFFF3E0);
+      default:
+        return const Color(0xFFF3F4F6);
+    }
+  }
+
+  Color _statusBadgeFg(String status) {
+    switch (status.toLowerCase()) {
+      case 'delivered':
+      case 'completed':
+      case 'refund_completed':
+      case 'item_received':
+        return const Color(0xFF1E7E4C);
+      case 'cancelled':
+      case 'failed':
+      case 'rejected':
+        return const Color(0xFFDC2626);
+      case 'shipped':
+      case 'out_for_delivery':
+      case 'item_picked':
+      case 'approved':
+      case 'dispatched':
+        return const Color(0xFF1A56DB);
+      case 'pending':
+      case 'requested':
+        return const Color(0xFFE65100);
+      default:
+        return const Color(0xFF374151);
+    }
   }
 
   // ── Customer Card ──────────────────────────────────────────────────────────
@@ -576,7 +603,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   // ── Payment Card ───────────────────────────────────────────────────────────
 
-  Widget _buildPaymentCard(bool isCod, double totalAmount) {
+  Widget _buildPaymentCard(bool isCod, DeliveryOrder order) {
     return _buildCard(
       child: Column(
         children: [
@@ -615,6 +642,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             SizedBox(height: 12.h),
             Divider(color: Colors.grey[200]),
             SizedBox(height: 12.h),
+            if (_display.orderStatus.toLowerCase() != 'delivered') ...[
+              _detailRow(
+                'Order Total',
+                '₹ ${order.totalAmount.toStringAsFixed(0)}',
+              ),
+              SizedBox(height: 8.h),
+              _detailRow('COD Charge', '₹ 40'),
+              SizedBox(height: 12.h),
+              Divider(color: Colors.grey[200]),
+              SizedBox(height: 12.h),
+            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -626,9 +664,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   color: Colors.grey[600]!,
                 ),
                 AppText(
-                  text: '₹ ${totalAmount.toStringAsFixed(0)}',
+                  text: '₹ ${order.amountToCollect.toStringAsFixed(0)}',
                   fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: _display.orderStatus.toLowerCase() == 'delivered'
                       ? AppColors.textPositiveSecondarycolor
                       : AppColors.ratingYellowcolor,
@@ -636,7 +674,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ],
             ),
             SizedBox(height: 12.h),
-            if (_display.orderStatus.toLowerCase() != 'delivered') ...[
+            if (_display.isInTransitStatus) ...[
               Divider(color: Colors.grey[200]),
               SizedBox(height: 12.h),
               Row(

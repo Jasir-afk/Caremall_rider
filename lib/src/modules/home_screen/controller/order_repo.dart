@@ -199,6 +199,8 @@ class OrderRepo {
         final topLevelSource =
             decoded['returns'] ??
             decoded['returnOrders'] ??
+            decoded['refunds'] ??
+            decoded['refundOrders'] ??
             decoded['orders'] ??
             decoded['return'] ??
             decoded['data'];
@@ -209,6 +211,8 @@ class OrderRepo {
           // 2. If 'data' or similar was a map, look inside it
           final secondarySource =
               topLevelSource['returns'] ??
+              topLevelSource['refunds'] ??
+              topLevelSource['refundOrders'] ??
               topLevelSource['orders'] ??
               topLevelSource['returnOrders'] ??
               topLevelSource['data'];
@@ -389,6 +393,7 @@ class OrderRepo {
   static Future<Map<String, dynamic>> updateReturnStatus({
     required String returnId,
     required String status,
+    String? pickupStatus,
   }) async {
     final token = await StorageService.getAuthToken();
 
@@ -399,7 +404,7 @@ class OrderRepo {
         'Accept': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({'status': status}),
+      body: jsonEncode({'status': status, 'pickupStatus': pickupStatus}),
     );
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -410,6 +415,51 @@ class OrderRepo {
       return {
         'success': false,
         'message': body['message'] ?? 'Failed to update return status.',
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateReturnItemStatus({
+    required String returnId,
+    required String returnItemStatus,
+    String? orderStatus,
+    String? pickStatus,
+    String? pickupStatus,
+    String? refundStatus,
+    String? replacementDeliveryStatus,
+    bool? isPicked,
+    bool? isDropped,
+  }) async {
+    final token = await StorageService.getAuthToken();
+
+    final response = await http.patch(
+      Uri.parse(ApiUrls.returnUpdateItemStatus(returnId)),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'returnItemStatus': returnItemStatus,
+        if (orderStatus != null) 'status': orderStatus,
+        if (pickStatus != null) 'pickStatus': pickStatus,
+        if (pickupStatus != null) 'pickupStatus': pickupStatus,
+        if (refundStatus != null) 'refundStatus': refundStatus,
+        if (replacementDeliveryStatus != null)
+          'replacementDeliveryStatus': replacementDeliveryStatus,
+        if (isPicked != null) 'isPicked': isPicked,
+        if (isDropped != null) 'isDropped': isDropped,
+      }),
+    );
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return {'success': true, 'data': body};
+    } else {
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Failed to update return item status.',
       };
     }
   }
@@ -448,6 +498,37 @@ class OrderRepo {
       }
     } catch (e) {
       return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Update the replacement delivery status for a return order.
+  static Future<Map<String, dynamic>> updateReturnReplacementStatus({
+    required String returnId,
+    required String replacementDeliveryStatus,
+  }) async {
+    final token = await StorageService.getAuthToken();
+
+    final response = await http.patch(
+      Uri.parse(ApiUrls.returnUpdateReplacementStatus(returnId)),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'replacementDeliveryStatus': replacementDeliveryStatus,
+      }),
+    );
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return {'success': true, 'data': body};
+    } else {
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Failed to update replacement status.',
+      };
     }
   }
 }

@@ -26,6 +26,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // ── Personal
   late TextEditingController _nameCtrl;
   late TextEditingController _emailCtrl;
+  late TextEditingController _addressCtrl;
   File? _selectedImage;
 
   // ── Payment
@@ -57,6 +58,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final p = widget.profile;
     _nameCtrl = TextEditingController(text: p.name);
     _emailCtrl = TextEditingController(text: p.email);
+    _addressCtrl = TextEditingController(text: p.address);
     _paymentMode = (p.paymentMode == 'upi') ? 'upi' : 'bank';
     _holderCtrl = TextEditingController(text: p.accountHolderName);
     _accountCtrl = TextEditingController(text: p.accountNumber);
@@ -74,6 +76,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
+    _addressCtrl.dispose();
     _holderCtrl.dispose();
     _accountCtrl.dispose();
     _ifscCtrl.dispose();
@@ -202,6 +205,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final result = await ProfileRepo.updateProfile(
         name: _nameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
+        address: _addressCtrl.text.trim(),
         avatar: _selectedImage,
         paymentMode: _paymentMode,
         accountHolderName: _paymentMode == 'bank'
@@ -428,8 +432,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
           validator: (v) {
             if (v == null || v.trim().isEmpty) return 'Name is required';
-            if (v.trim().length < 3)
+            if (v.trim().length < 3) {
               return 'Name must be at least 3 characters';
+            }
             if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(v.trim())) {
               return 'Enter a valid name (letters and spaces only)';
             }
@@ -451,6 +456,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           validator: (v) {
             if (v == null || v.trim().isEmpty) return null;
             if (!v.contains('@')) return 'Enter a valid email';
+            return null;
+          },
+        ),
+        SizedBox(height: 16.h),
+        _EditField(
+          label: 'Address',
+          controller: _addressCtrl,
+          icon: const Icon(
+            Icons.location_on_outlined,
+            color: AppColors.primarycolor,
+          ),
+          hint: 'Enter your address',
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return 'Address is required';
             return null;
           },
         ),

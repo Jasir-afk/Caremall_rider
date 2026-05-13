@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
-import 'package:care_mall_rider/core/utils/logger_service.dart';
+import 'package:care_mall_rider/app/utils/network/logger_service.dart';
 
 class UploadRepo {
   /// Uploads an image to the general upload API.

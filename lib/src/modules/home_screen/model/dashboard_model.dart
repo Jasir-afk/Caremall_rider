@@ -72,6 +72,8 @@ class TodayOrder {
 
   bool get isCod => paymentMethod.toLowerCase() == 'cod';
 
+  num get amountToCollect => isCod ? finalAmount + 40 : finalAmount;
+
   factory TodayOrder.fromJson(Map<String, dynamic> json) {
     final addr = json['shippingAddress'];
     final dispatch = json['dispatch'];
