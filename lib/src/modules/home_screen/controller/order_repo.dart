@@ -502,9 +502,13 @@ class OrderRepo {
   }
 
   /// Update the replacement delivery status for a return order.
+  /// Used for Phase 2 delivery steps (hub → customer) so returnItemStatus
+  /// is never touched — the backend enum doesn't allow going backwards.
   static Future<Map<String, dynamic>> updateReturnReplacementStatus({
     required String returnId,
     required String replacementDeliveryStatus,
+    String? orderStatus,    // pass 'completed' on final delivery step
+    String? pickupStatus,   // pass 'item_delivered' on final delivery step
   }) async {
     final token = await StorageService.getAuthToken();
 
@@ -517,6 +521,8 @@ class OrderRepo {
       },
       body: jsonEncode({
         'replacementDeliveryStatus': replacementDeliveryStatus,
+        if (orderStatus != null) 'status': orderStatus,
+        if (pickupStatus != null) 'pickupStatus': pickupStatus,
       }),
     );
 

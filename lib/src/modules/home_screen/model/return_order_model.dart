@@ -116,10 +116,10 @@ class ReturnOrder {
           : null,
       pickupStatus: json['pickupStatus']?.toString(),
       returnItemStatus: json['returnItemStatus']?.toString(),
-      refundStatus: json['refundStatus']?.toString() ?? 'pending',
-      pickStatus: json['pickStatus']?.toString() ?? 'pending',
+      refundStatus: json['refundStatus']?.toString(),
+      pickStatus: json['pickStatus']?.toString(),
       replacementDeliveryStatus:
-          json['replacementDeliveryStatus']?.toString() ?? 'pending',
+          json['replacementDeliveryStatus']?.toString(),
       pickupPhotos: (json['pickupPhotos'] as List<dynamic>?)
           ?.map((e) => e.toString())
           .toList(),

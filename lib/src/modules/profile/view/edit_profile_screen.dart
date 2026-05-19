@@ -225,8 +225,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         // Update local storage so Home screen and others reflect the change
         final newName = _nameCtrl.text.trim();
         final newEmail = _emailCtrl.text.trim();
+        final newAddress = _addressCtrl.text.trim();
         await StorageService.saveUserName(newName);
         await StorageService.saveUserEmail(newEmail);
+        await StorageService.saveUserAddress(newAddress);
+
+        // Save new avatar URL if available in response
+        final data = result['data'];
+        if (data != null) {
+          final user = data['deliveryBoy'] ?? data['rider'] ?? data['user'] ?? data['data'];
+          if (user != null && user['avatar'] != null) {
+            await StorageService.saveUserAvatar(user['avatar'].toString());
+          }
+          if (user != null && user['address'] != null) {
+            await StorageService.saveUserAddress(user['address'].toString());
+          }
+        }
 
         Get.back(result: true);
         AppSnackbar.showSuccess(
@@ -579,9 +593,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(10),
             ],
-            validator: (v) => (v == null || v.length < 10)
-                ? 'Enter a valid 10-digit number'
-                : null,
+            validator: (v) {
+              if (v == null || v.isEmpty) return null;
+              return v.length < 10 ? 'Enter a valid 10-digit number' : null;
+            },
           ),
           SizedBox(height: 14.h),
           _EditField(
@@ -595,7 +610,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             hint: 'e.g. name@upi',
             validator: (v) {
               if (v == null || v.trim().isEmpty) return null;
-              final upiRegex = RegExp(r'^[\w.\-]+@[a-zA-Z]+$');
+              // Permissive regex for UPI handles (allows numbers and dots)
+              final upiRegex = RegExp(r'^[\w.\-]+@[a-zA-Z0-9.\-]+$');
               return upiRegex.hasMatch(v.trim())
                   ? null
                   : 'Enter a valid UPI ID (e.g. name@upi)';
