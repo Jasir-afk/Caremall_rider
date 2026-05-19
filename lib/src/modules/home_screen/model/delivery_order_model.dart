@@ -9,7 +9,6 @@ class DeliveryOrder {
   final ShippingAddress shippingAddress;
   final DispatchInfo? dispatch;
   final List<OrderItem> items;
-
   DeliveryOrder({
     required this.id,
     required this.orderId,

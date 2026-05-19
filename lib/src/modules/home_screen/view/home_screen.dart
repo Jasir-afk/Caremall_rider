@@ -28,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // 0: New, 1: In Transit, 2: History
   int _selectedTab = 0;
   String _userName = 'Rider';
+  String? _userAvatar;
   // ── API state ───────────
   List<DeliveryOrder> _allOrders = [];
   bool _ordersLoading = true;
@@ -48,8 +49,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadUserData() async {
     final name = await StorageService.getUserName();
-    if (name != null && name.isNotEmpty && mounted) {
-      setState(() => _userName = name);
+    final avatar = await StorageService.getUserAvatar();
+    if (mounted) {
+      setState(() {
+        if (name != null && name.isNotEmpty) _userName = name;
+        _userAvatar = avatar;
+      });
     }
   }
 
@@ -207,6 +212,32 @@ class _HomeScreenState extends State<HomeScreen> {
       .where((o) => _historyStatuses.contains(o.orderStatus.toLowerCase()))
       .toList();
 
+  List<ReturnOrder> get _activeReturnOrders => _returnOrders.where((o) {
+    final status = o.orderStatus.toLowerCase();
+    if (_historyStatuses.contains(status)) return false;
+    if (status.contains('rejected')) {
+      final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+        ' ',
+        '_',
+      );
+      if (itemStatus == 'rejected_dropped') return false;
+    }
+    return true;
+  }).toList();
+
+  List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
+    final status = o.orderStatus.toLowerCase();
+    if (_historyStatuses.contains(status)) return true;
+    if (status.contains('rejected')) {
+      final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+        ' ',
+        '_',
+      );
+      if (itemStatus == 'rejected_dropped') return true;
+    }
+    return false;
+  }).toList();
+
   /// Today's delivered COD orders for breakdown
   List<DeliveryOrder> get _todayCodOrders {
     final now = DateTime.now();
@@ -358,13 +389,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: Row(
                         children: [
-                          _buildTab('New (${_newOrders.length})', 0),
+                          _buildTab('New', _newOrders.length, 0),
+                          _buildTab('In Transit', _inTransitOrders.length, 1),
+                          _buildTab('Returns', _activeReturnOrders.length, 2),
                           _buildTab(
-                            'In Transit (${_inTransitOrders.length})',
-                            1,
+                            'History',
+                            _historyOrders.length + _historyReturnOrders.length,
+                            3,
                           ),
-                          _buildTab('Returns (${_returnOrders.length})', 2),
-                          _buildTab('History (${_historyOrders.length})', 3),
                         ],
                       ),
                     ),
@@ -372,9 +404,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     // ─── Order / Return List ──────────────────────────────────────────
                     Expanded(
-                      child: _isReturnTab
-                          ? _buildReturnList()
-                          : _buildDeliveryList(),
+                      child: _selectedTab == 3
+                          ? _buildHistoryList()
+                          : (_isReturnTab
+                                ? _buildReturnList()
+                                : _buildDeliveryList()),
                     ),
                   ] else if (_selectedIndex == 1) ...[
                     const Expanded(child: RouteScreen()),
@@ -383,43 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-      // ─── Bottom Navigation ─────────────────────────────────────────────────
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() => _selectedIndex = index);
-          // Always refresh user data (like name) when switching tabs
-          // This ensures that returning from Profile -> Home shows the new name
-          _loadUserData();
-        },
-        selectedItemColor: AppColors.primarycolor,
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.route_outlined),
-            activeIcon: Icon(Icons.route),
-            label: 'Route',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            activeIcon: Icon(Icons.account_balance_wallet),
-            label: 'Wallet',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _buildCustomBottomNav(),
     );
   }
 
@@ -644,7 +642,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTab(String title, int index) {
+  Widget _buildTab(String label, int count, int index) {
     final bool isSelected = _selectedTab == index;
     return Expanded(
       child: GestureDetector(
@@ -654,22 +652,50 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(6.r),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
+            boxShadow:
+                isSelected
+                    ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                    : null,
           ),
           child: Center(
-            child: AppText(
-              text: title,
-              fontSize: 13.sp,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              color: isSelected ? AppColors.primarycolor : Colors.grey[600]!,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AppText(
+                  text: label,
+                  fontSize: 13.sp,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  color: isSelected ? AppColors.primarycolor : Colors.grey[600]!,
+                  maxLines: 1,
+                ),
+                if (count > 0)
+                  Positioned(
+                    top: -10.h,
+                    right: -14.w,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444), // Vibrant Red
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        count > 99 ? '99+' : '$count',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 8.5.sp,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -731,6 +757,68 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildHistoryList() {
+    if (_ordersLoading || _returnsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_ordersError != null && _returnsError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
+            SizedBox(height: 12.h),
+            AppText(
+              text: 'Could not load history',
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600]!,
+            ),
+            SizedBox(height: 8.h),
+            TextButton.icon(
+              onPressed: _fetchOrders,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    final delOrders = _historyOrders;
+    final retOrders = _historyReturnOrders;
+    final totalCount = delOrders.length + retOrders.length;
+    return RefreshIndicator(
+      onRefresh: _fetchOrders,
+      child: totalCount == 0
+          ? SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: 400.h,
+                child: Center(
+                  child: AppText(
+                    text: 'No history here',
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[500]!,
+                  ),
+                ),
+              ),
+            )
+          : ListView.separated(
+              padding: EdgeInsets.all(16.w),
+              itemCount: totalCount,
+              separatorBuilder: (_, _) => SizedBox(height: 12.h),
+              itemBuilder: (context, index) {
+                if (index < delOrders.length) {
+                  return _buildOrderCard(delOrders[index]);
+                } else {
+                  return _buildReturnCard(retOrders[index - delOrders.length]);
+                }
+              },
+            ),
+    );
+  }
+
   Widget _buildReturnList() {
     if (_returnsLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -758,10 +846,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    if (_returnOrders.isEmpty) {
+    final activeReturns = _activeReturnOrders;
+    if (activeReturns.isEmpty) {
       return Center(
         child: AppText(
-          text: 'No return orders',
+          text: 'No active returns',
           fontSize: 14.sp,
           fontWeight: FontWeight.w500,
           color: Colors.grey[500]!,
@@ -772,9 +861,9 @@ class _HomeScreenState extends State<HomeScreen> {
       onRefresh: _fetchOrders,
       child: ListView.separated(
         padding: EdgeInsets.all(16.w),
-        itemCount: _returnOrders.length,
+        itemCount: activeReturns.length,
         separatorBuilder: (_, _) => SizedBox(height: 12.h),
-        itemBuilder: (context, index) => _buildReturnCard(_returnOrders[index]),
+        itemBuilder: (context, index) => _buildReturnCard(activeReturns[index]),
       ),
     );
   }
@@ -1288,5 +1377,195 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return const Color(0xFF374151);
     }
+  }
+  // ─── Custom Bottom Navigation ──────────────────────────────────────────
+
+  Widget _buildCustomBottomNav() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        16.w,
+        10.h,
+        16.w,
+        10.h + Get.mediaQuery.padding.bottom,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24.r),
+          border: Border.all(color: Colors.grey[100]!),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildNavItem(0, Icons.home_outlined, Icons.home, 'Home'),
+            _buildNavItem(1, Icons.route_outlined, Icons.route, 'Route'),
+            _buildNavItem(
+              2,
+              Icons.account_balance_wallet_outlined,
+              Icons.account_balance_wallet,
+              'Wallet',
+            ),
+            _buildNavItem(3, Icons.person_outline, Icons.person, 'Profile'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    IconData activeIcon,
+    String label,
+  ) {
+    final bool isSelected = _selectedIndex == index;
+
+    // Determine badge count for specific tabs
+    int? badgeCount;
+    if (index == 0) {
+      badgeCount = _newOrders.length;
+    } else if (index == 1) {
+      // Route screen shows all active delivery orders (New + In Transit)
+      badgeCount = _newOrders.length + _inTransitOrders.length;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        if (_selectedIndex != index) {
+          setState(() => _selectedIndex = index);
+          _loadUserData();
+        }
+      },
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutQuint,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 16.w : 10.w,
+          vertical: 8.h,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primarycolor : Colors.transparent,
+          borderRadius: BorderRadius.circular(20.r),
+          boxShadow:
+              isSelected
+                  ? [
+                    BoxShadow(
+                      color: AppColors.primarycolor.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                  : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _buildNavIcon(index, isSelected, icon, activeIcon),
+                if (badgeCount != null && badgeCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: _buildBadge(badgeCount, isSelected),
+                  ),
+              ],
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutQuint,
+              child:
+                  isSelected
+                      ? Padding(
+                        padding: EdgeInsets.only(left: 8.w),
+                        child: AppText(
+                          text: label,
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          maxLines: 1,
+                        ),
+                      )
+                      : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadge(int count, bool isSelected) {
+    return Container(
+      padding: EdgeInsets.all(4.w),
+      constraints: BoxConstraints(minWidth: 16.w, minHeight: 16.w),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.white : AppColors.primarycolor,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isSelected ? AppColors.primarycolor : Colors.white,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          count > 99 ? '99+' : count.toString(),
+          style: TextStyle(
+            color: isSelected ? AppColors.primarycolor : Colors.white,
+            fontSize: 8.sp,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavIcon(
+    int index,
+    bool isSelected,
+    IconData icon,
+    IconData activeIcon,
+  ) {
+    if (index == 3 && _userAvatar != null && _userAvatar!.isNotEmpty) {
+      return Container(
+        width: 22.w,
+        height: 22.w,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected ? Colors.white : Colors.grey[300]!,
+            width: 1.5,
+          ),
+          image: DecorationImage(
+            image: NetworkImage(_userAvatar!),
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+    return Icon(
+      isSelected ? activeIcon : icon,
+      color: isSelected ? Colors.white : Colors.grey[400],
+      size: 22.sp,
+    );
   }
 }

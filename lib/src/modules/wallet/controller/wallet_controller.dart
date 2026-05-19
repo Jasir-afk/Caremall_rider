@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:care_mall_rider/src/modules/wallet/controller/wallet_repo.dart';
 import 'package:care_mall_rider/src/modules/wallet/model/wallet_model.dart';
 import 'package:care_mall_rider/src/modules/wallet/model/withdrawal_request_model.dart';
+import 'package:care_mall_rider/src/modules/wallet/view/withdrawal_success_screen.dart';
 
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 
@@ -39,10 +40,8 @@ class WalletController extends GetxController {
       isLoading(true);
       final result = await WalletRepo.requestWithdrawal(amount);
       if (result['success']) {
-        AppSnackbar.showSuccess(
-          title: 'Success',
-          message: result['message'] ?? 'Withdrawal requested',
-        );
+        Get.back(); // Close bottom sheet
+        Get.to(() => WithdrawalSuccessScreen(amount: amount));
         await fetchWalletData(); // Refresh data
       } else {
         AppSnackbar.showError(

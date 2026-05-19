@@ -46,6 +46,7 @@ class AppSnackbar {
     required Color iconColor,
     required Color borderColor,
   }) {
+    Get.closeAllSnackbars();
     Get.rawSnackbar(
       titleText: Text(
         title,
@@ -82,7 +83,7 @@ class AppSnackbar {
         ),
       ],
       snackPosition: SnackPosition.TOP,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(seconds: 3),
       animationDuration: const Duration(milliseconds: 300),
       isDismissible: true,
       forwardAnimationCurve: Curves.easeOutBack,

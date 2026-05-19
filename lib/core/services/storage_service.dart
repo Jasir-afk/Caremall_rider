@@ -6,6 +6,8 @@ class StorageService {
   static const String _phoneNumberKey = 'phone_number';
   static const String _userNameKey = 'user_name';
   static const String _userEmailKey = 'user_email';
+  static const String _userAvatarKey = 'user_avatar';
+  static const String _userAddressKey = 'user_address';
   static const String _kycStatusKey = 'kyc_status';
 
   static SharedPreferences? _prefs;
@@ -71,6 +73,30 @@ class StorageService {
     return prefs.getString(_userEmailKey);
   }
 
+  /// Save user avatar URL
+  static Future<bool> saveUserAvatar(String url) async {
+    final prefs = await _instance;
+    return await prefs.setString(_userAvatarKey, url);
+  }
+
+  /// Get saved user avatar URL
+  static Future<String?> getUserAvatar() async {
+    final prefs = await _instance;
+    return prefs.getString(_userAvatarKey);
+  }
+
+  /// Save user address
+  static Future<bool> saveUserAddress(String address) async {
+    final prefs = await _instance;
+    return await prefs.setString(_userAddressKey, address);
+  }
+
+  /// Get saved user address
+  static Future<String?> getUserAddress() async {
+    final prefs = await _instance;
+    return prefs.getString(_userAddressKey);
+  }
+
   /// Mark KYC as completed (legacy support, now sets status to under_review)
   static Future<bool> saveKycCompleted(bool completed) async {
     if (completed) {
@@ -107,6 +133,8 @@ class StorageService {
     await prefs.remove(_phoneNumberKey);
     await prefs.remove(_userNameKey);
     await prefs.remove(_userEmailKey);
+    await prefs.remove(_userAvatarKey);
+    await prefs.remove(_userAddressKey);
     await prefs.remove(_kycStatusKey);
     return true;
   }

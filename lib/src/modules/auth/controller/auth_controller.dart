@@ -15,6 +15,7 @@ class AuthController extends GetxController {
   final phoneNumber = ''.obs;
   final userName = ''.obs;
   final userEmail = ''.obs;
+  final userAvatar = ''.obs;
   final authToken = ''.obs;
 
   @override
@@ -30,11 +31,13 @@ class AuthController extends GetxController {
     final savedPhone = await StorageService.getPhoneNumber();
     final savedName = await StorageService.getUserName();
     final savedEmail = await StorageService.getUserEmail();
+    final savedAvatar = await StorageService.getUserAvatar();
 
     if (savedToken != null) authToken.value = savedToken;
     if (savedPhone != null) phoneNumber.value = savedPhone;
     if (savedName != null) userName.value = savedName;
     if (savedEmail != null) userEmail.value = savedEmail;
+    if (savedAvatar != null) userAvatar.value = savedAvatar;
   }
 
   /// Sends OTP for login
@@ -156,6 +159,10 @@ class AuthController extends GetxController {
             userEmail.value = userData['email'];
             await StorageService.saveUserEmail(userData['email']);
           }
+          if (userData['avatar'] != null) {
+            userAvatar.value = userData['avatar'];
+            await StorageService.saveUserAvatar(userData['avatar']);
+          }
           // Phone is already passed to the function, but good to save it from response if available and consistent
           // However, the phone arg is the one used for OTP, so we stick with it or update if response has it.
           // The response has phone as number, we treat as string.
@@ -233,6 +240,7 @@ class AuthController extends GetxController {
     phoneNumber.value = '';
     userName.value = '';
     userEmail.value = '';
+    userAvatar.value = '';
     authToken.value = '';
     isLoading.value = false;
     isResendingOtp.value = false;

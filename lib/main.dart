@@ -10,13 +10,10 @@ import 'package:get/get.dart';
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
-
   // Initialize persistent storage
   await StorageService.init();
-
   runApp(const MyApp());
 }
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 

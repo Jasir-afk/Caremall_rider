@@ -29,10 +29,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _loadProfile() {
     setState(() {
-      _profileFuture = ProfileRepo.getProfile().then((json) {
+      _profileFuture = ProfileRepo.getProfile().then((json) async {
         final data =
             json['deliveryBoy'] ?? json['rider'] ?? json['data'] ?? json;
-        return RiderProfile.fromJson(data as Map<String, dynamic>);
+        var profile = RiderProfile.fromJson(data as Map<String, dynamic>);
+
+        // Update local storage for fields that are present
+        StorageService.saveUserName(profile.name);
+        StorageService.saveUserAvatar(profile.avatar);
+        
+        if (profile.address.isNotEmpty) {
+          StorageService.saveUserAddress(profile.address);
+        } else {
+          // If server doesn't return an address, try to restore from local storage
+          final localAddress = await StorageService.getUserAddress();
+          if (localAddress != null && localAddress.isNotEmpty) {
+            profile = RiderProfile(
+              id: profile.id,
+              name: profile.name,
+              phone: profile.phone,
+              email: profile.email,
+              address: localAddress,
+              avatar: profile.avatar,
+              status: profile.status,
+              kycStatus: profile.kycStatus,
+              vehicleType: profile.vehicleType,
+              registrationNumber: profile.registrationNumber,
+              paymentMode: profile.paymentMode,
+              accountHolderName: profile.accountHolderName,
+              accountNumber: profile.accountNumber,
+              ifscCode: profile.ifscCode,
+              bankName: profile.bankName,
+              upiId: profile.upiId,
+              upiNumber: profile.upiNumber,
+            );
+          }
+        }
+
+        return profile;
       });
     });
   }

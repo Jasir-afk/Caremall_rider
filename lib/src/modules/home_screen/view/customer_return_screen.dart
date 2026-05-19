@@ -229,7 +229,8 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
                     'Received',
                     _returnMethod == 'received',
                     ret.isPicked,
-                    ((ret.isPicked && ret.orderStatus.toLowerCase() != 'rejected') ||
+                    ((ret.isPicked &&
+                                ret.orderStatus.toLowerCase() != 'rejected') ||
                             (ret.returnItemStatus?.toLowerCase() ?? '')
                                 .contains('rejected_picked') ||
                             ((ret.returnItemStatus?.toLowerCase() ?? '')
@@ -246,7 +247,8 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
                     'Dropped',
                     _returnMethod == 'dropped',
                     ret.isDropped,
-                    ((ret.isDropped && ret.orderStatus.toLowerCase() != 'rejected') ||
+                    ((ret.isDropped &&
+                                ret.orderStatus.toLowerCase() != 'rejected') ||
                             (ret.returnItemStatus?.toLowerCase() ?? '')
                                 .contains('rejected_dropped'))
                         ? null
@@ -272,11 +274,13 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
                   _detailRow(
                     'Item Status',
                     (ret.orderStatus.toLowerCase() == 'rejected' &&
-                            !ret.returnItemStatus!
-                                .toLowerCase()
-                                .contains('rejected'))
+                            !ret.returnItemStatus!.toLowerCase().contains(
+                              'rejected',
+                            ))
                         ? 'PENDING'
-                        : ret.returnItemStatus!.replaceAll('_', ' ').toUpperCase(),
+                        : ret.returnItemStatus!
+                              .replaceAll('_', ' ')
+                              .toUpperCase(),
                     isStatus: true,
                   ),
                 ],
@@ -453,7 +457,8 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
         if (result['success'] == true) {
           AppSnackbar.showSuccess(
             title: 'Success',
-            message: 'Item status updated to $targetStatus!',
+            message:
+                'Item status updated to ${targetStatus.replaceAll('_', ' ').toUpperCase()}!',
           );
           _fetchDetail();
           _hasChanged = true;
