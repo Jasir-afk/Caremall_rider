@@ -47,6 +47,9 @@ class AuthService {
         };
       }
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException')) {
+        return {'success': false, 'message': 'Failed to connect to server. Please check your internet connection or server status.'};
+      }
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
@@ -101,6 +104,9 @@ class AuthService {
         };
       }
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException')) {
+        return {'success': false, 'message': 'Failed to connect to server. Please check your internet connection or server status.'};
+      }
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }

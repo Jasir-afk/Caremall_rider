@@ -2,10 +2,7 @@ class ReturnItemStatusResponse {
   final String? message;
   final String? returnItemStatus;
 
-  ReturnItemStatusResponse({
-    this.message,
-    this.returnItemStatus,
-  });
+  ReturnItemStatusResponse({this.message, this.returnItemStatus});
 
   factory ReturnItemStatusResponse.fromJson(Map<String, dynamic> json) {
     return ReturnItemStatusResponse(

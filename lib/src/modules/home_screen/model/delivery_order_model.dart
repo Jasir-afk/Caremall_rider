@@ -83,6 +83,7 @@ class DeliveryOrder {
       'in_transit',
       'in-transit',
       'picked_up',
+      'undelivered',
     };
     return transitStatuses.contains(orderStatus.toLowerCase());
   }

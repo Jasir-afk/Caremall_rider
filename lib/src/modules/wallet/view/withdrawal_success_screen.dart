@@ -1,4 +1,4 @@
-import 'package:care_mall_rider/app/commenwidget/apptext.dart'; 
+import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
 import 'package:care_mall_rider/src/modules/profile/controller/profile_repo.dart';
 import 'package:care_mall_rider/src/modules/profile/model/profile_model.dart';

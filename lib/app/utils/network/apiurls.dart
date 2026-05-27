@@ -1,8 +1,9 @@
 class ApiUrls {
   // Base URL
-  static String baseURL = 'https://test.api.caremallonline.com';
+    static String baseURL = 'https://test.api.caremallonline.com';
+  // static String baseURL = 'https://api.caremall.in';
   // static const String baseURL = 'http://192.168.1.5:3000';
-  // Auth
+  // Authi
   static String get sendOtp =>
       '$baseURL/api/v1/rider/auth/send-otp'; // POST – send OTP to rider
   static String get login =>
@@ -15,7 +16,6 @@ class ApiUrls {
       '$baseURL/api/v1/rider/auth/resend-otp'; // POST – resend OTP
   static String get logout =>
       '$baseURL/api/v1/rider/auth/logout'; // POST – logout rider
-
   // Kyc
   static String get kycSubmit =>
       '$baseURL/api/v1/rider/kyc/submit'; // POST – submit kyc

@@ -149,13 +149,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  Future<void> _reportFailedDelivery() async {
+  Future<void> _markUndelivered() async {
     final TextEditingController reasonController = TextEditingController();
 
     Get.dialog(
       AlertDialog(
+        backgroundColor: Colors.white,
         title: AppText(
-          text: 'Cannot Deliver',
+          text: 'Mark Undelivered',
           fontSize: 18.sp,
           fontWeight: FontWeight.w700,
         ),
@@ -164,7 +165,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AppText(
-              text: 'Please provide a reason for the delivery failure:',
+              text: 'Please provide a reason for marking this order as undelivered:',
               fontSize: 14.sp,
             ),
             SizedBox(height: 12.h),
@@ -181,7 +182,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final reason = reasonController.text.trim();
@@ -193,9 +197,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 return;
               }
               Get.back();
+              
               setState(() => _updatingStatus = true);
-              final result = await OrderRepo.reportFailedOrder(
+              final result = await OrderRepo.updateOrderStatus(
                 orderId: widget.order.id,
+                status: 'undelivered',
                 reason: reason,
               );
               if (mounted) setState(() => _updatingStatus = false);
@@ -203,13 +209,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               if (result['success'] == true) {
                 AppSnackbar.showSuccess(
                   title: 'Success',
-                  message: 'Delivery failure reported.',
+                  message: 'Order marked as undelivered.',
                 );
                 _fetchDetail();
+                _hasChanged = true;
               } else {
                 AppSnackbar.showError(
                   title: 'Error',
-                  message: result['message'] ?? 'Failed to report failure.',
+                  message: result['message'] ?? 'Failed to update status.',
                 );
               }
             },
@@ -217,7 +224,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               backgroundColor: AppColors.errorMain,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Report'),
+            child: const Text('Confirm'),
           ),
         ],
       ),
@@ -395,25 +402,29 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   // ── Error state ────────────────────────────────────────────────────────────
 
   Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
-          SizedBox(height: 12.h),
-          AppText(
-            text: 'Could not load order details',
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[600]!,
+    return RefreshIndicator(
+      onRefresh: _fetchDetail,
+      color: AppColors.primarycolor,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
+                SizedBox(height: 12.h),
+                AppText(
+                  text: 'Could not load order details',
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[600]!,
+                ),
+              ],
+            ),
           ),
-          SizedBox(height: 8.h),
-          TextButton.icon(
-            onPressed: _fetchDetail,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -423,7 +434,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Widget _buildContent(DeliveryOrder order) {
     final bool isCod = order.isCod;
     final bool isCompleted =
-        order.orderStatus == 'delivered' || order.orderStatus == 'cancelled';
+        order.orderStatus == 'delivered' ||
+        order.orderStatus == 'cancelled' ||
+        order.orderStatus == 'failed';
 
     return Column(
       children: [
@@ -508,6 +521,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       case 'cancelled':
       case 'failed':
       case 'rejected':
+      case 'undelivered':
         return const Color(0xFFFFE3E3);
       case 'shipped':
       case 'out_for_delivery':
@@ -533,6 +547,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       case 'cancelled':
       case 'failed':
       case 'rejected':
+      case 'undelivered':
         return const Color(0xFFDC2626);
       case 'shipped':
       case 'out_for_delivery':
@@ -961,6 +976,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       );
     }
 
+    final isAlreadyUndelivered = _display.orderStatus.toLowerCase() == 'undelivered';
+
     // In Transit - Delivery Actions
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -976,32 +993,34 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: AppButton(
-              onPressed: _updatingStatus ? null : _reportFailedDelivery,
-              btncolor: Colors.white,
-              borderRadius: 8.r,
-              buttonStyle: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all(Colors.white),
-                side: WidgetStateProperty.all(
-                  const BorderSide(color: AppColors.errorMain),
-                ),
-                shape: WidgetStateProperty.all(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.r),
+          if (!isAlreadyUndelivered) ...[
+            Expanded(
+              child: AppButton(
+                onPressed: _updatingStatus ? null : _markUndelivered,
+                btncolor: Colors.white,
+                borderRadius: 8.r,
+                buttonStyle: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.all(Colors.white),
+                  side: WidgetStateProperty.all(
+                    const BorderSide(color: AppColors.errorMain),
                   ),
+                  shape: WidgetStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                  ),
+                  elevation: WidgetStateProperty.all(0),
                 ),
-                elevation: WidgetStateProperty.all(0),
-              ),
-              child: AppText(
-                text: 'Cannot Deliver',
-                color: AppColors.errorMain,
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w600,
+                child: AppText(
+                  text: 'Undelivered',
+                  color: AppColors.errorMain,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
-          SizedBox(width: 12.w),
+            SizedBox(width: 12.w),
+          ],
           Expanded(
             child: AppButton(
               onPressed: _uploading || _updatingStatus

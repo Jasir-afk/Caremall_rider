@@ -11,8 +11,9 @@ import 'package:care_mall_rider/src/modules/home_screen/view/route_screen.dart';
 import 'package:care_mall_rider/src/modules/profile/view/profile_screen.dart';
 import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/delivery_order_model.dart';
-import 'package:care_mall_rider/src/modules/home_screen/model/return_order_model.dart';
-import 'package:care_mall_rider/src/modules/home_screen/view/return_details_screen.dart';
+import 'package:care_mall_rider/src/modules/return/controller/return_repo.dart';
+import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
+import 'package:care_mall_rider/src/modules/return/view/return_details_screen.dart';
 import 'package:care_mall_rider/src/modules/wallet/view/wallet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -74,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .catchError((e) {
             if (mounted) setState(() => _ordersError = e.toString());
           }),
-      OrderRepo.getReturnOrders()
+      ReturnRepo.getReturnOrders()
           .then((returns) {
             if (mounted) setState(() => _returnOrders = returns);
           })
@@ -193,13 +194,21 @@ class _HomeScreenState extends State<HomeScreen> {
     'accepted',
     'new',
   };
-  static const _transitStatuses = {'shipped', 'out_for_delivery', 'picked_up'};
+  static const _transitStatuses = {
+    'shipped',
+    'out_for_delivery',
+    'picked_up',
+    'undelivered'
+  };
   static const _historyStatuses = {
     'delivered',
     'failed',
     'cancelled',
     'completed',
     'refund_completed',
+    'returned',
+    'refunded',
+    'return_completed',
   };
 
   List<DeliveryOrder> get _newOrders => _allOrders
@@ -652,16 +661,15 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(6.r),
-            boxShadow:
-                isSelected
-                    ? [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                    : null,
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Center(
             child: Stack(
@@ -671,7 +679,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   text: label,
                   fontSize: 13.sp,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                  color: isSelected ? AppColors.primarycolor : Colors.grey[600]!,
+                  color: isSelected
+                      ? AppColors.primarycolor
+                      : Colors.grey[600]!,
                   maxLines: 1,
                 ),
                 if (count > 0)
@@ -679,7 +689,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     top: -10.h,
                     right: -14.w,
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 5.w,
+                        vertical: 1.h,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFEF4444), // Vibrant Red
                         borderRadius: BorderRadius.circular(10.r),
@@ -708,25 +721,28 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_ordersError != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
-            SizedBox(height: 12.h),
-            AppText(
-              text: 'Could not load orders',
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600]!,
+      return RefreshIndicator(
+        onRefresh: _fetchOrders,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 400.h,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
+                  SizedBox(height: 12.h),
+                  AppText(
+                    text: 'Could not load orders',
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600]!,
+                  ),
+                ],
+              ),
             ),
-            SizedBox(height: 8.h),
-            TextButton.icon(
-              onPressed: _fetchOrders,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
+          ),
         ),
       );
     }
@@ -762,25 +778,28 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_ordersError != null && _returnsError != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
-            SizedBox(height: 12.h),
-            AppText(
-              text: 'Could not load history',
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600]!,
+      return RefreshIndicator(
+        onRefresh: _fetchOrders,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 400.h,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
+                  SizedBox(height: 12.h),
+                  AppText(
+                    text: 'Could not load history',
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600]!,
+                  ),
+                ],
+              ),
             ),
-            SizedBox(height: 8.h),
-            TextButton.icon(
-              onPressed: _fetchOrders,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
+          ),
         ),
       );
     }
@@ -824,25 +843,28 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_returnsError != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
-            SizedBox(height: 12.h),
-            AppText(
-              text: 'Could not load returns',
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600]!,
+      return RefreshIndicator(
+        onRefresh: _fetchOrders,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 400.h,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
+                  SizedBox(height: 12.h),
+                  AppText(
+                    text: 'Could not load returns',
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600]!,
+                  ),
+                ],
+              ),
             ),
-            SizedBox(height: 8.h),
-            TextButton.icon(
-              onPressed: _fetchOrders,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
+          ),
         ),
       );
     }
@@ -1032,43 +1054,123 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SizedBox(width: 16.w),
                 Expanded(
-                  child: SizedBox(
-                    height: 36.h,
-                    child: AppButton(
-                      onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ReturnDetailsScreen(returnOrder: ret),
-                          ),
+                  child: () {
+                    final bool isRejected = ret.orderStatus
+                        .toLowerCase()
+                        .contains('rejected');
+                    final String itemStatusClean =
+                        (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+                          ' ',
+                          '_',
                         );
-                        if (result == true && mounted) {
-                          _fetchOrders();
-                        }
-                      },
-                      btncolor: AppColors.primarycolor,
-                      borderRadius: 6.r,
-                      buttonStyle: ButtonStyle(
-                        backgroundColor: WidgetStateProperty.all(
-                          AppColors.primarycolor,
-                        ),
-                        shape: WidgetStateProperty.all(
-                          RoundedRectangleBorder(
+
+                    final bool isCompleted =
+                        _historyStatuses.contains(
+                          ret.orderStatus.toLowerCase(),
+                        ) ||
+                        (isRejected && itemStatusClean == 'rejected_dropped') ||
+                        (ret.returnType?.toLowerCase() != 'replacement' &&
+                            ret.isDropped) ||
+                        (ret.returnType?.toLowerCase() == 'replacement' &&
+                            (ret.replacementDeliveryStatus?.toLowerCase() ==
+                                    'received' ||
+                                ret.replacementDeliveryStatus?.toLowerCase() ==
+                                    'delivered'));
+
+                    if (isCompleted) {
+                      final bool showAsRejectedDelivered =
+                          isRejected || itemStatusClean.contains('rejected');
+                      return GestureDetector(
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ReturnDetailsScreen(returnOrder: ret),
+                            ),
+                          );
+                          if (result == true && mounted) {
+                            _fetchOrders();
+                          }
+                        },
+                        child: Container(
+                          height: 36.h,
+                          decoration: BoxDecoration(
+                            color: showAsRejectedDelivered
+                                ? const Color(0xFFFFE3E3)
+                                : const Color(0xFFE6F4EE),
                             borderRadius: BorderRadius.circular(6.r),
                           ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                showAsRejectedDelivered
+                                    ? Icons.cancel_rounded
+                                    : Icons.check_circle,
+                                color: showAsRejectedDelivered
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFF1E7E4C),
+                                size: 14.sp,
+                              ),
+                              SizedBox(width: 4.w),
+                              AppText(
+                                text: showAsRejectedDelivered
+                                    ? 'Rejected Delivered'
+                                    : (ret.returnType?.toLowerCase() ==
+                                              'replacement'
+                                          ? 'Replaced'
+                                          : 'Returned'),
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w700,
+                                color: showAsRejectedDelivered
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFF1E7E4C),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return SizedBox(
+                      height: 36.h,
+                      child: AppButton(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ReturnDetailsScreen(returnOrder: ret),
+                            ),
+                          );
+                          if (result == true && mounted) {
+                            _fetchOrders();
+                          }
+                        },
+                        btncolor: AppColors.primarycolor,
+                        borderRadius: 6.r,
+                        buttonStyle: ButtonStyle(
+                          backgroundColor: WidgetStateProperty.all(
+                            AppColors.primarycolor,
+                          ),
+                          shape: WidgetStateProperty.all(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6.r),
+                            ),
+                          ),
+                        ),
+                        child: AppText(
+                          text: ret.returnType?.toLowerCase() == 'replacement'
+                              ? 'Start Replacement'
+                              : 'Start Refund',
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
-                      child: AppText(
-                        text: ret.returnType?.toLowerCase() == 'replacement'
-                            ? 'Start Replacement'
-                            : 'Start Refund',
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+                    );
+                  }(),
                 ),
               ],
             ),
@@ -1458,16 +1560,15 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primarycolor : Colors.transparent,
           borderRadius: BorderRadius.circular(20.r),
-          boxShadow:
-              isSelected
-                  ? [
-                    BoxShadow(
-                      color: AppColors.primarycolor.withValues(alpha: 0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                  : [],
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primarycolor.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1487,19 +1588,18 @@ class _HomeScreenState extends State<HomeScreen> {
             AnimatedSize(
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeOutQuint,
-              child:
-                  isSelected
-                      ? Padding(
-                        padding: EdgeInsets.only(left: 8.w),
-                        child: AppText(
-                          text: label,
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          maxLines: 1,
-                        ),
-                      )
-                      : const SizedBox.shrink(),
+              child: isSelected
+                  ? Padding(
+                      padding: EdgeInsets.only(left: 8.w),
+                      child: AppText(
+                        text: label,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        maxLines: 1,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ],
         ),

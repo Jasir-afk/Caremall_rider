@@ -132,24 +132,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.error_outline, size: 48.sp, color: Colors.grey),
-                  SizedBox(height: 12.h),
-                  AppText(
-                    text: 'Could not load profile',
-                    fontSize: 14.sp,
-                    color: Colors.grey[600]!,
+            return RefreshIndicator(
+              onRefresh: () async => _loadProfile(),
+              color: AppColors.primarycolor,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.8,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.error_outline, size: 48.sp, color: Colors.grey),
+                        SizedBox(height: 12.h),
+                        AppText(
+                          text: 'Could not load profile',
+                          fontSize: 14.sp,
+                          color: Colors.grey[600]!,
+                        ),
+                      ],
+                    ),
                   ),
-                  SizedBox(height: 12.h),
-                  TextButton.icon(
-                    onPressed: _loadProfile,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ],
+                ),
               ),
             );
           }

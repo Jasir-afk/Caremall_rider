@@ -14,12 +14,14 @@ class SplashScreen extends StatefulWidget {
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
+
 class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
     _navigate();
   }
+
   Future<void> _navigate() async {
     await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;
@@ -51,6 +53,7 @@ class _SplashScreenState extends State<SplashScreen> {
       }
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

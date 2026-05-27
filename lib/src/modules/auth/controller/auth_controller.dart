@@ -1,6 +1,7 @@
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/src/modules/auth/controller/auth_repo.dart';
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get_rx/src/rx_types/rx_types.dart';
 import 'package:get/get_state_manager/src/simple/get_controllers.dart';
 
@@ -138,6 +139,12 @@ class AuthController extends GetxController {
 
     try {
       final result = await AuthRepo.verifyOtp(phone: phone, otp: otp);
+      if (kDebugMode) {
+        print("FULL RESPONSE: $result");
+      }
+      if (kDebugMode) {
+        print("TOKEN IS: ${result['token']}");
+      }
 
       if (result['success']) {
         // Save authentication token if provided

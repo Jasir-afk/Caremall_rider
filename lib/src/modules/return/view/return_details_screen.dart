@@ -1,7 +1,7 @@
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
-import 'package:care_mall_rider/src/modules/home_screen/model/return_order_model.dart';
+import 'package:care_mall_rider/src/modules/return/controller/return_repo.dart';
+import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -63,7 +63,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       _error = null;
     });
     try {
-      final detail = await OrderRepo.getReturnDetail(widget.returnOrder.id);
+      final detail = await ReturnRepo.getReturnDetail(widget.returnOrder.id);
       if (mounted) {
         setState(() {
           _detail = detail;
@@ -72,8 +72,9 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
           // (replacementDeliveryStatus is 'sent' or 'received').
           // Rejected replacements NEVER enter phase 2 — they have their own
           // 3-step rejected flow, so we exclude them here.
-          final isRejected =
-              detail.orderStatus.toLowerCase().contains('rejected');
+          final isRejected = detail.orderStatus.toLowerCase().contains(
+            'rejected',
+          );
           _replacementAllowed =
               detail.returnType?.toLowerCase() == 'replacement' &&
               !isRejected &&
@@ -93,12 +94,26 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
 
   void _initMethod() {
     final ret = _display;
+    final orderStatus = ret.orderStatus.toLowerCase();
+    if (orderStatus == 'completed' ||
+        orderStatus == 'refund_completed' ||
+        orderStatus == 'returned' ||
+        orderStatus == 'refunded' ||
+        orderStatus == 'return_completed' ||
+        orderStatus == 'cancelled' ||
+        orderStatus == 'failed') {
+      _returnMethod = null;
+      return;
+    }
+
     final isReplacement = ret.returnType?.toLowerCase() == 'replacement';
     final isDropped = ret.isDropped;
     final isPicked = ret.isPicked;
     final replStatus = ret.replacementDeliveryStatus?.toLowerCase();
-    final itemStatus =
-        (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(' ', '_');
+    final itemStatus = (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+      ' ',
+      '_',
+    );
     final isRejected = ret.orderStatus.toLowerCase().contains('rejected');
 
     if (isReplacement && isRejected) {
@@ -161,15 +176,21 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     final isReplacement = ret.returnType?.toLowerCase() == 'replacement';
     final replStatus = ret.replacementDeliveryStatus?.toLowerCase();
     final orderStatus = ret.orderStatus.toLowerCase();
-    final itemStatus =
-        (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(' ', '_');
+    final itemStatus = (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+      ' ',
+      '_',
+    );
     final isRejected = orderStatus.contains('rejected');
 
     // ── Replacement rejected by admin: 3-step timeline ─────────────────────
     // Step 0: Received from Hub | Step 1: Returned to Customer | Step 2: Closed
     if (isReplacement && isRejected) {
-      if (itemStatus.contains('rejected_dropped')) return 3; // all done / closed
-      if (itemStatus.contains('rejected_picked')) return 1;  // returning to customer
+      if (itemStatus.contains('rejected_dropped')) {
+        return 3; // all done / closed
+      }
+      if (itemStatus.contains('rejected_picked')) {
+        return 1; // returning to customer
+      }
       return 0; // waiting to pick from hub
     }
 
@@ -185,7 +206,9 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     // Backend enum: pending | sent | received
     if (isReplacement && ret.isDropped && _replacementAllowed) {
       if (replStatus == 'received' || orderStatus == 'completed') return 2;
-      if (replStatus == 'sent') return 1; // picked from hub, heading to customer
+      if (replStatus == 'sent') {
+        return 1; // picked from hub, heading to customer
+      }
       return 0; // pending — just acknowledged, not yet picked
     }
 
@@ -202,6 +225,9 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
 
     if (orderStatus == 'completed' ||
         orderStatus == 'refund_completed' ||
+        orderStatus == 'returned' ||
+        orderStatus == 'refunded' ||
+        orderStatus == 'return_completed' ||
         replStatus == 'delivered' ||
         itemStatus == 'item_delivered') {
       return 3;
@@ -275,57 +301,40 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
           ),
         ],
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh_rounded, size: 20, color: _labelGrey),
-          onPressed: _fetchDetail,
-          tooltip: 'Refresh',
-        ),
-        SizedBox(width: 4.w),
-      ],
     );
   }
 
   Widget _buildError() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.cloud_off_rounded, size: 52.sp, color: Colors.grey[300]),
-          SizedBox(height: 16.h),
-          Text(
-            'Could not load details',
-            style: TextStyle(
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w600,
-              color: _textDark,
-            ),
-          ),
-          SizedBox(height: 6.h),
-          Text(
-            'Check your connection and try again.',
-            style: TextStyle(fontSize: 13.sp, color: _labelGrey),
-          ),
-          SizedBox(height: 20.h),
-          GestureDetector(
-            onTap: _fetchDetail,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 10.h),
-              decoration: BoxDecoration(
-                color: AppColors.primarycolor,
-                borderRadius: BorderRadius.circular(24.r),
-              ),
-              child: Text(
-                'Retry',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14.sp,
+    return RefreshIndicator(
+      onRefresh: _fetchDetail,
+      color: AppColors.primarycolor,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off_rounded, size: 52.sp, color: Colors.grey[300]),
+                SizedBox(height: 16.h),
+                Text(
+                  'Could not load details',
+                  style: TextStyle(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w600,
+                    color: _textDark,
+                  ),
                 ),
-              ),
+                SizedBox(height: 6.h),
+                Text(
+                  'Check your connection and try again.',
+                  style: TextStyle(fontSize: 13.sp, color: _labelGrey),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -348,7 +357,10 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         !(_display.orderStatus.toLowerCase() == 'cancelled' ||
             _display.orderStatus.toLowerCase() == 'failed' ||
             _display.orderStatus.toLowerCase() == 'completed' ||
-            _display.orderStatus.toLowerCase() == 'refund_completed');
+            _display.orderStatus.toLowerCase() == 'refund_completed' ||
+            _display.orderStatus.toLowerCase() == 'returned' ||
+            _display.orderStatus.toLowerCase() == 'refunded' ||
+            _display.orderStatus.toLowerCase() == 'return_completed');
 
     return Column(
       children: [
@@ -833,7 +845,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
                     try {
                       setState(() => _updatingStatus = true);
                       final result =
-                          await OrderRepo.updateReturnReplacementStatus(
+                          await ReturnRepo.updateReturnReplacementStatus(
                             returnId: ret.id,
                             replacementDeliveryStatus: 'sent',
                           );
@@ -921,8 +933,10 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       droppedLabel = 'Returned to Customer';
       pickedIcon = Icons.warehouse_outlined;
       droppedIcon = Icons.person_pin_circle_rounded;
-      final normStatus = (ret.returnItemStatus?.toLowerCase() ?? '')
-          .replaceAll(' ', '_');
+      final normStatus = (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+        ' ',
+        '_',
+      );
       isPickedDone =
           normStatus == 'rejected_picked' || normStatus == 'rejected_dropped';
       isDroppedDone = normStatus == 'rejected_dropped';
@@ -955,8 +969,10 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       droppedLabel = 'Delivered';
       pickedIcon = Icons.warehouse_rounded;
       droppedIcon = Icons.person_pin_circle_rounded;
-      final itemStatus =
-          (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(' ', '_');
+      final itemStatus = (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+        ' ',
+        '_',
+      );
       isPickedDone =
           itemStatus == 'rejected_picked' || itemStatus == 'rejected_dropped';
       isDroppedDone = itemStatus == 'rejected_dropped';
@@ -1107,9 +1123,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
               statusText: ret.returnItemStatus!,
             ),
           ],
-          if (!isReplacement &&
-              !isRejected &&
-              ret.pickStatus != null) ...[
+          if (!isReplacement && !isRejected && ret.pickStatus != null) ...[
             _dividerLine(),
             _kv(
               'Pick Status',
@@ -1118,7 +1132,9 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
               statusText: ret.pickStatus!,
             ),
           ],
-          if (isReplacement && !isRejected && ret.replacementDeliveryStatus != null) ...[
+          if (isReplacement &&
+              !isRejected &&
+              ret.replacementDeliveryStatus != null) ...[
             _dividerLine(),
             _kv(
               'Replacement Status',
@@ -1136,11 +1152,11 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
               statusText: ret.refundStatus!,
             ),
           ],
-          _dividerLine(),
-          _kv(
-            'Requested On',
-            ret.createdAt != null ? _formatDate(ret.createdAt!) : '—',
-          ),
+          // _dividerLine(),
+          // _kv(
+          //   'Requested On',
+          //   ret.createdAt != null ? _formatDate(ret.createdAt!) : '—',
+          // ),
         ],
       ),
     );
@@ -1244,8 +1260,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
   // ── Confirm label helper ───────────────────────────────────────────────────
   String _buildConfirmLabel() {
     final isReplacement = _display.returnType?.toLowerCase() == 'replacement';
-    final isRejected =
-        _display.orderStatus.toLowerCase().contains('rejected');
+    final isRejected = _display.orderStatus.toLowerCase().contains('rejected');
 
     if (isReplacement && isRejected) {
       // Replacement rejected by admin: pick from hub → return to customer
@@ -1417,7 +1432,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       if (isReplacementDeliveryPhase) {
         // Only drop_off (deliver to customer) reaches here.
         // replacementDeliveryStatus: pending→sent (warehouse card) → received (this confirm)
-        final result = await OrderRepo.updateReturnReplacementStatus(
+        final result = await ReturnRepo.updateReturnReplacementStatus(
           returnId: _display.id,
           replacementDeliveryStatus: 'received',
           orderStatus: 'completed',
@@ -1477,7 +1492,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         }
       }
 
-      final result = await OrderRepo.updateReturnItemStatus(
+      final result = await ReturnRepo.updateReturnItemStatus(
         returnId: _display.id,
         returnItemStatus: itemStatus,
         orderStatus: orderStatus,
@@ -1694,6 +1709,8 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       case 'item_received':
       case 'received':
       case 'refunded':
+      case 'returned':
+      case 'return_completed':
       case 'dropped':
         return const Color(0xFFE6F9EE);
       case 'cancelled':
@@ -1736,6 +1753,8 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       case 'item_received':
       case 'received':
       case 'refunded':
+      case 'returned':
+      case 'return_completed':
       case 'dropped':
         return _green;
       case 'cancelled':

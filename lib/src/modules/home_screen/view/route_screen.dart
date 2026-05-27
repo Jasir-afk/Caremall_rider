@@ -365,40 +365,38 @@ class _RouteScreenState extends State<RouteScreen> {
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: EdgeInsets.all(24.w),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.error_outline, color: Colors.red, size: 48.sp),
-                    SizedBox(height: 12.h),
-                    AppText(
-                      text: 'Could not load today\'s route.',
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textnaturalcolor,
-                    ),
-                    SizedBox(height: 8.h),
-                    AppText(
-                      text: snapshot.error.toString(),
-                      fontSize: 12.sp,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 20.h),
-                    ElevatedButton.icon(
-                      onPressed: _refresh,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
+            return RefreshIndicator(
+              onRefresh: () async => _refresh(),
+              color: Colors.red,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.8,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.w),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red, size: 48.sp),
+                          SizedBox(height: 12.h),
+                          AppText(
+                            text: 'Could not load today\'s route.',
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textnaturalcolor,
+                          ),
+                          SizedBox(height: 8.h),
+                          AppText(
+                            text: snapshot.error.toString(),
+                            fontSize: 12.sp,
+                            color: Colors.grey,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -601,6 +599,7 @@ class _StopCard extends StatelessWidget {
         return const Color(0xFFE6F4EE);
       case 'cancelled':
       case 'failed':
+      case 'undelivered':
         return const Color(0xFFFFE3E3);
       case 'shipped':
       case 'out_for_delivery':
@@ -619,6 +618,7 @@ class _StopCard extends StatelessWidget {
         return const Color(0xFF1E7E4C);
       case 'cancelled':
       case 'failed':
+      case 'undelivered':
         return Colors.red;
       case 'shipped':
       case 'out_for_delivery':

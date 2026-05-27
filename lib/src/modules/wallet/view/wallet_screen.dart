@@ -33,44 +33,41 @@ class _WalletScreenState extends State<WalletScreen> {
           // Show error state with retry
           if (controller.errorMessage.value != null &&
               controller.walletData.value == null) {
-            return Center(
-              child: Padding(
-                padding: EdgeInsets.all(24.w),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 56.sp,
-                      color: Colors.grey[400],
-                    ),
-                    SizedBox(height: 16.h),
-                    AppText(
-                      text: 'Failed to Load Wallet',
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textnaturalcolor,
-                    ),
-                    SizedBox(height: 8.h),
-                    AppText(
-                      text: controller.errorMessage.value!,
-                      fontSize: 13.sp,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 24.h),
-                    ElevatedButton.icon(
-                      onPressed: controller.fetchWalletData,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primarycolor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
+            return RefreshIndicator(
+              onRefresh: controller.refreshAll,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.8,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.w),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.wifi_off_rounded,
+                            size: 56.sp,
+                            color: Colors.grey[400],
+                          ),
+                          SizedBox(height: 16.h),
+                          AppText(
+                            text: 'Failed to Load Wallet',
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textnaturalcolor,
+                          ),
+                          SizedBox(height: 8.h),
+                          AppText(
+                            text: controller.errorMessage.value!,
+                            fontSize: 13.sp,
+                            color: Colors.grey,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -80,7 +77,7 @@ class _WalletScreenState extends State<WalletScreen> {
           final transactions = wallet?.transactions ?? [];
 
           return RefreshIndicator(
-            onRefresh: controller.fetchWalletData,
+            onRefresh: controller.refreshAll,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -310,6 +307,8 @@ class _WalletScreenState extends State<WalletScreen> {
                                 status: req.status ?? 'pending',
                                 date: dateStr,
                                 paymentMode: req.paymentMode ?? 'upi',
+                                adminNote: req.adminNote,
+                                processedAt: req.processedAt,
                               );
                             },
                           );
@@ -361,71 +360,153 @@ class _WalletScreenState extends State<WalletScreen> {
     required String status,
     required String date,
     required String paymentMode,
+    String? adminNote,
+    DateTime? processedAt,
   }) {
     Color statusColor;
+    IconData statusIcon;
     switch (status.toLowerCase()) {
       case 'processed':
       case 'completed':
         statusColor = Colors.green;
+        statusIcon = Icons.check_circle_outline_rounded;
+        break;
+      case 'accepted':
+        statusColor = const Color(0xFF2196F3); // blue
+        statusIcon = Icons.thumb_up_alt_outlined;
         break;
       case 'pending':
         statusColor = Colors.orange;
+        statusIcon = Icons.hourglass_empty_rounded;
         break;
       case 'failed':
       case 'rejected':
         statusColor = Colors.red;
+        statusIcon = Icons.cancel_outlined;
         break;
       default:
         statusColor = Colors.grey;
+        statusIcon = Icons.info_outline_rounded;
     }
+
+    final processedDateStr = processedAt != null
+        ? DateFormat('dd MMM yyyy').format(processedAt)
+        : null;
 
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: Colors.grey.shade100),
+        border: Border.all(color: statusColor.withValues(alpha: 0.15)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              AppText(
-                text: '₹ ${amount.toStringAsFixed(2)}',
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textnaturalcolor,
+              // Left: icon + amount + mode
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      statusIcon,
+                      size: 18.sp,
+                      color: statusColor,
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppText(
+                        text: '₹ ${amount.toStringAsFixed(2)}',
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textnaturalcolor,
+                      ),
+                      SizedBox(height: 2.h),
+                      AppText(
+                        text: 'Mode: ${paymentMode.toUpperCase()}',
+                        fontSize: 11.sp,
+                        color: Colors.grey.shade600,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              SizedBox(height: 4.h),
-              AppText(
-                text: 'Mode: ${paymentMode.toUpperCase()}',
-                fontSize: 12.sp,
-                color: Colors.grey.shade600,
+              // Right: status badge + date
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 4.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4.r),
+                    ),
+                    child: AppText(
+                      text: status.toUpperCase(),
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  AppText(
+                    text: processedDateStr ?? date,
+                    fontSize: 11.sp,
+                    color: Colors.grey.shade400,
+                  ),
+                ],
               ),
             ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
+          // Admin note (shown when accepted/processed)
+          if (adminNote != null && adminNote.isNotEmpty) ...
+            [
+              SizedBox(height: 10.h),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4.r),
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(
+                  horizontal: 10.w,
+                  vertical: 8.h,
                 ),
-                child: AppText(
-                  text: status.toUpperCase(),
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 14.sp,
+                      color: statusColor,
+                    ),
+                    SizedBox(width: 6.w),
+                    Expanded(
+                      child: AppText(
+                        text: adminNote,
+                        fontSize: 12.sp,
+                        color: Colors.grey.shade700,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(height: 4.h),
-              AppText(text: date, fontSize: 11.sp, color: Colors.grey.shade400),
             ],
-          ),
         ],
       ),
     );

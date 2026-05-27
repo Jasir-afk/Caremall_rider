@@ -281,9 +281,16 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                       ),
                       _UpperCaseFormatter(),
                     ],
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Please enter registration number'
-                        : null,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Please enter registration number';
+                      }
+                      final stripped = v.replaceAll(RegExp(r'\s+'), '');
+                      if (!RegExp(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}$').hasMatch(stripped)) {
+                        return 'Please enter a valid registration number (e.g. KL 01 AB 1234)';
+                      }
+                      return null;
+                    },
                   ),
                   SizedBox(height: 20.h),
 

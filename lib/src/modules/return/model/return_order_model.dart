@@ -90,15 +90,61 @@ class ReturnOrder {
     }
 
     final parsedRefundAmount = (json['refundAmount'] ?? 0).toDouble();
-    double parsedTotalAmount = json['totalAmount'] != null
-        ? json['totalAmount'].toDouble()
-        : (json['amount'] != null
-              ? json['amount'].toDouble()
-              : (orderObj != null &&
-                        orderObj is Map &&
-                        orderObj['totalAmount'] != null
-                    ? orderObj['totalAmount'].toDouble()
-                    : parsedRefundAmount));
+
+    // Try every known field name a backend might use for the order value.
+    // Replacement orders often have no 'refundAmount', so we must look wider.
+    double? tryDouble(dynamic v) {
+      if (v == null) return null;
+      final d = double.tryParse(v.toString());
+      return (d != null && d > 0) ? d : null;
+    }
+
+    double parsedTotalAmount =
+        // 1. Top-level explicit amount fields
+        tryDouble(json['totalAmount']) ??
+        tryDouble(json['amount']) ??
+        tryDouble(json['replacementAmount']) ??
+        tryDouble(json['orderAmount']) ??
+        tryDouble(json['itemAmount']) ??
+        // 2. Nested order object
+        (orderObj is Map
+            ? (tryDouble(orderObj['totalAmount']) ??
+                  tryDouble(orderObj['amount']) ??
+                  tryDouble(orderObj['subTotal']) ??
+                  tryDouble(orderObj['subtotal']) ??
+                  tryDouble(orderObj['orderTotal']))
+            : null) ??
+        // 3. Sum items array if present
+        (() {
+          final items =
+              json['items'] ?? (orderObj is Map ? orderObj['items'] : null);
+          if (items is List && items.isNotEmpty) {
+            double sum = 0;
+            for (final item in items) {
+              if (item is Map) {
+                final price =
+                    double.tryParse(
+                      (item['price'] ??
+                              item['amount'] ??
+                              item['totalPrice'] ??
+                              0)
+                          .toString(),
+                    ) ??
+                    0;
+                final qty =
+                    double.tryParse(
+                      (item['quantity'] ?? item['qty'] ?? 1).toString(),
+                    ) ??
+                    1;
+                sum += price * qty;
+              }
+            }
+            if (sum > 0) return sum;
+          }
+          return null;
+        })() ??
+        // 4. Last resort: refundAmount (for refund orders; 0 for replacements)
+        parsedRefundAmount;
 
     return ReturnOrder(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
@@ -118,8 +164,7 @@ class ReturnOrder {
       returnItemStatus: json['returnItemStatus']?.toString(),
       refundStatus: json['refundStatus']?.toString(),
       pickStatus: json['pickStatus']?.toString(),
-      replacementDeliveryStatus:
-          json['replacementDeliveryStatus']?.toString(),
+      replacementDeliveryStatus: json['replacementDeliveryStatus']?.toString(),
       pickupPhotos: (json['pickupPhotos'] as List<dynamic>?)
           ?.map((e) => e.toString())
           .toList(),

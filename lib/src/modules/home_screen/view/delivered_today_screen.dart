@@ -47,16 +47,6 @@ class _DeliveredTodayScreenState extends State<DeliveredTodayScreen> {
           fontWeight: FontWeight.w700,
           color: AppColors.textnaturalcolor,
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.refresh_rounded,
-              color: AppColors.primarycolor,
-              size: 22.sp,
-            ),
-            onPressed: _refresh,
-          ),
-        ],
       ),
       body: FutureBuilder<DashboardModel>(
         future: _future,
@@ -66,44 +56,41 @@ class _DeliveredTodayScreenState extends State<DeliveredTodayScreen> {
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: EdgeInsets.all(24.w),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 56.sp,
-                      color: Colors.grey[400],
-                    ),
-                    SizedBox(height: 16.h),
-                    AppText(
-                      text: 'Failed to load data',
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textnaturalcolor,
-                    ),
-                    SizedBox(height: 8.h),
-                    AppText(
-                      text: 'Check your connection and try again.',
-                      fontSize: 13.sp,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 24.h),
-                    ElevatedButton.icon(
-                      onPressed: _refresh,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primarycolor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
+            return RefreshIndicator(
+              onRefresh: () async => _refresh(),
+              color: AppColors.primarycolor,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.8,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.w),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.wifi_off_rounded,
+                            size: 56.sp,
+                            color: Colors.grey[400],
+                          ),
+                          SizedBox(height: 16.h),
+                          AppText(
+                            text: 'Failed to load data',
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textnaturalcolor,
+                          ),
+                          SizedBox(height: 8.h),
+                          AppText(
+                            text: 'Check your connection and try again.',
+                            fontSize: 13.sp,
+                            color: Colors.grey,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -374,7 +361,8 @@ class _OrderCard extends StatelessWidget {
     }
   }
 
-  String get _statusLabel => order.orderStatus.replaceAll('_', ' ').toUpperCase();
+  String get _statusLabel =>
+      order.orderStatus.replaceAll('_', ' ').toUpperCase();
 
   @override
   Widget build(BuildContext context) {

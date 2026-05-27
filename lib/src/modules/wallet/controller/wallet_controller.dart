@@ -42,7 +42,11 @@ class WalletController extends GetxController {
       if (result['success']) {
         Get.back(); // Close bottom sheet
         Get.to(() => WithdrawalSuccessScreen(amount: amount));
-        await fetchWalletData(); // Refresh data
+        // Refresh both wallet balance and withdrawal request list
+        await Future.wait([
+          fetchWalletData(),
+          fetchWithdrawalRequests(),
+        ]);
       } else {
         AppSnackbar.showError(
           title: 'Error',
@@ -54,6 +58,15 @@ class WalletController extends GetxController {
     } finally {
       isLoading(false);
     }
+  }
+
+  /// Refresh all wallet data — used by pull-to-refresh and on screen resume
+  /// so that accepted/processed withdrawals are reflected immediately.
+  Future<void> refreshAll() async {
+    await Future.wait([
+      fetchWalletData(),
+      fetchWithdrawalRequests(),
+    ]);
   }
 
   Future<void> fetchWithdrawalRequests() async {

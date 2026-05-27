@@ -1,8 +1,8 @@
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
-import 'package:care_mall_rider/src/modules/home_screen/model/return_order_model.dart';
+import 'package:care_mall_rider/src/modules/return/controller/return_repo.dart';
+import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -50,7 +50,7 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
       _error = null;
     });
     try {
-      final detail = await OrderRepo.getReturnDetail(widget.returnOrder.id);
+      final detail = await ReturnRepo.getReturnDetail(widget.returnOrder.id);
       if (mounted) {
         setState(() {
           _detail = detail;
@@ -87,39 +87,37 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
             fontWeight: FontWeight.w600,
             color: AppColors.textnaturalcolor,
           ),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.refresh, color: Colors.grey[600]),
-              onPressed: _fetchDetail,
-            ),
-          ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 48.sp,
-                      color: Colors.grey[400],
+            ? RefreshIndicator(
+                onRefresh: _fetchDetail,
+                color: AppColors.primarycolor,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.8,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.wifi_off_rounded,
+                            size: 48.sp,
+                            color: Colors.grey[400],
+                          ),
+                          SizedBox(height: 12.h),
+                          AppText(
+                            text: 'Could not load details',
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600]!,
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: 12.h),
-                    AppText(
-                      text: 'Could not load details',
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[600]!,
-                    ),
-                    SizedBox(height: 8.h),
-                    TextButton.icon(
-                      onPressed: _fetchDetail,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                    ),
-                  ],
+                  ),
                 ),
               )
             : _buildContent(),
@@ -445,7 +443,7 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
     try {
       setState(() => _updatingStatus = true);
       final isReceived = targetStatus == 'received';
-      final result = await OrderRepo.updateReturnItemStatus(
+      final result = await ReturnRepo.updateReturnItemStatus(
         returnId: widget.returnOrder.id,
         returnItemStatus: targetStatus,
         pickupStatus: !isReceived ? 'item_delivered' : null,

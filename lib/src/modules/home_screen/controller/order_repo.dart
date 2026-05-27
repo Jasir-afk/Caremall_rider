@@ -4,16 +4,14 @@ import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
-
 import 'package:care_mall_rider/src/modules/home_screen/model/dashboard_model.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/delivery_order_model.dart';
-import 'package:care_mall_rider/src/modules/home_screen/model/return_order_model.dart';
+import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
 
 class OrderRepo {
   /// Fetch all delivery orders assigned to this rider.
   static Future<List<DeliveryOrder>> getDeliveryOrders() async {
     final token = await StorageService.getAuthToken();
-
     final response = await http.get(
       Uri.parse(ApiUrls.deliveryOrders),
       headers: {
@@ -38,7 +36,6 @@ class OrderRepo {
   /// Fetch dashboard statistics for the rider.
   static Future<Map<String, dynamic>> getDashboardStats() async {
     final token = await StorageService.getAuthToken();
-
     final response = await http.get(
       Uri.parse(ApiUrls.dashboard),
       headers: {
@@ -235,6 +232,7 @@ class OrderRepo {
   static Future<Map<String, dynamic>> updateOrderStatus({
     required String orderId,
     required String status,
+    String? reason,
   }) async {
     final token = await StorageService.getAuthToken();
 
@@ -245,7 +243,10 @@ class OrderRepo {
         'Accept': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({'status': status}),
+      body: jsonEncode({
+        'status': status,
+        if (reason != null) 'reason': reason,
+      }),
     );
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -507,8 +508,8 @@ class OrderRepo {
   static Future<Map<String, dynamic>> updateReturnReplacementStatus({
     required String returnId,
     required String replacementDeliveryStatus,
-    String? orderStatus,    // pass 'completed' on final delivery step
-    String? pickupStatus,   // pass 'item_delivered' on final delivery step
+    String? orderStatus, // pass 'completed' on final delivery step
+    String? pickupStatus, // pass 'item_delivered' on final delivery step
   }) async {
     final token = await StorageService.getAuthToken();
 
