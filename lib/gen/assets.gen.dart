@@ -15,7 +15,7 @@ class Assets {
 class _AssetsIconsGen {
   const _AssetsIconsGen();
 
-  SvgGenImage get appLogo => const SvgGenImage('assets/icons/app_logo.svg');
+  SvgGenImage get appLogo => const SvgGenImage('assets/icons/app_logo.png');
 
   SvgGenImage get mail => const SvgGenImage('assets/icons/mail.svg');
 

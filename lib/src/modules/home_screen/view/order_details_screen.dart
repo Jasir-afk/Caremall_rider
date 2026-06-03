@@ -17,7 +17,7 @@ class OrderDetailsScreen extends StatefulWidget {
   /// detail (including items) using [order.id] on load.
   final DeliveryOrder order;
   const OrderDetailsScreen({super.key, required this.order});
-  @override
+
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
 }
 
@@ -33,7 +33,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       false; // Tracks if photo was uploaded in current session
   bool _updatingStatus = false;
 
-  @override
   void initState() {
     super.initState();
     _fetchDetail();
@@ -202,7 +201,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               final result = await OrderRepo.updateOrderStatus(
                 orderId: widget.order.id,
                 status: 'undelivered',
-                reason: reason,
+                isUndelivered: true,
+                undeliveredWarehouseDrop: false,
+                note: reason,
               );
               if (mounted) setState(() => _updatingStatus = false);
 
@@ -229,6 +230,63 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _markWarehouseDrop() async {
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: Colors.white,
+        title: AppText(
+          text: 'Confirm Warehouse Drop',
+          fontSize: 18.sp,
+          fontWeight: FontWeight.w700,
+        ),
+        content: AppText(
+          text: 'Are you sure you want to mark this order as dropped at warehouse?',
+          fontSize: 14.sp,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: AppText(
+              text: 'Cancel',
+              fontSize: 14.sp,
+              color: AppColors.textnaturalcolor,
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primarycolor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _updatingStatus = true);
+    final result = await OrderRepo.markWarehouseDrop(
+      orderId: widget.order.id,
+    );
+    if (mounted) setState(() => _updatingStatus = false);
+
+    if (result['success'] == true) {
+      AppSnackbar.showSuccess(
+        title: 'Success',
+        message: 'Order dropped at warehouse.',
+      );
+      _fetchDetail();
+      _hasChanged = true;
+    } else {
+      AppSnackbar.showError(
+        title: 'Error',
+        message: result['message'] ?? 'Failed to mark warehouse drop.',
+      );
+    }
   }
 
   Future<void> _deliverOrder() async {
@@ -356,7 +414,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
@@ -689,7 +746,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ],
             ),
             SizedBox(height: 12.h),
-            if (_display.isInTransitStatus) ...[
+            if (_display.isInTransitStatus && !_display.orderStatus.toLowerCase().contains('undelivered')) ...[
               Divider(color: Colors.grey[200]),
               SizedBox(height: 12.h),
               Row(
@@ -977,6 +1034,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
 
     final isAlreadyUndelivered = _display.orderStatus.toLowerCase() == 'undelivered';
+    final isWarehouseDropPending = isAlreadyUndelivered && !_display.undeliveredWarehouseDrop;
 
     // In Transit - Delivery Actions
     return Container(
@@ -1021,15 +1079,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ),
             SizedBox(width: 12.w),
           ],
-          Expanded(
-            child: AppButton(
-              onPressed: _uploading || _updatingStatus
-                  ? null
-                  : (_photoUploaded
-                        ? (_display.isCod && !_paymentCollected
-                              ? null
-                              : _deliverOrder)
-                        : _uploadPhoto),
+          if (isWarehouseDropPending) ...[
+            Expanded(
+              child: AppButton(
+                onPressed: _updatingStatus ? null : _markWarehouseDrop,
+                btncolor: AppColors.primarycolor,
+                borderRadius: 8.r,
+                child: AppText(
+                  text: 'Drop at Warehouse',
+                  color: Colors.white,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            SizedBox(width: 12.w),
+          ],
+          if (!isAlreadyUndelivered)
+            Expanded(
+              child: AppButton(
+                onPressed: _uploading || _updatingStatus
+                    ? null
+                    : (_photoUploaded
+                          ? (_display.isCod && !_paymentCollected
+                                ? null
+                                : _deliverOrder)
+                          : _uploadPhoto),
               btncolor: AppColors.primarycolor,
               borderRadius: 8.r,
               buttonStyle: ButtonStyle(

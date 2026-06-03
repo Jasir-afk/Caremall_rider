@@ -146,6 +146,12 @@ class ReturnOrder {
         // 4. Last resort: refundAmount (for refund orders; 0 for replacements)
         parsedRefundAmount;
 
+    final rawReturnItemStatus = json['returnItemStatus']?.toString();
+    final returnItemStatus = (rawReturnItemStatus?.toLowerCase() == 'sent' ||
+                              rawReturnItemStatus?.toLowerCase() == 'received')
+        ? 'dropped'
+        : rawReturnItemStatus;
+
     return ReturnOrder(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       returnId: (json['returnId'] ?? json['_id'] ?? '').toString(),
@@ -161,7 +167,7 @@ class ReturnOrder {
           ? DateTime.tryParse(json['createdAt'].toString())
           : null,
       pickupStatus: json['pickupStatus']?.toString(),
-      returnItemStatus: json['returnItemStatus']?.toString(),
+      returnItemStatus: returnItemStatus,
       refundStatus: json['refundStatus']?.toString(),
       pickStatus: json['pickStatus']?.toString(),
       replacementDeliveryStatus: json['replacementDeliveryStatus']?.toString(),
@@ -175,24 +181,12 @@ class ReturnOrder {
       user: customer is Map<String, dynamic> ? customer : null,
       isPicked:
           json['isPicked'] == true ||
-          (json['returnItemStatus']?.toString().toLowerCase().contains(
-                'picked',
-              ) ??
-              false) ||
-          (json['returnItemStatus']?.toString().toLowerCase().contains(
-                'received',
-              ) ??
-              false) ||
-          (json['returnItemStatus']?.toString().toLowerCase().contains(
-                'dropped',
-              ) ??
-              false),
+          (returnItemStatus?.toLowerCase().contains('picked') ?? false) ||
+          (returnItemStatus?.toLowerCase().contains('received') ?? false) ||
+          (returnItemStatus?.toLowerCase().contains('dropped') ?? false),
       isDropped:
           json['isDropped'] == true ||
-          (json['returnItemStatus']?.toString().toLowerCase().contains(
-                'dropped',
-              ) ??
-              false),
+          (returnItemStatus?.toLowerCase().contains('dropped') ?? false),
     );
   }
 

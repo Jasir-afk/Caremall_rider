@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -10,10 +11,15 @@ import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart
 
 class OrderRepo {
   /// Fetch all delivery orders assigned to this rider.
-  static Future<List<DeliveryOrder>> getDeliveryOrders() async {
+  static Future<List<DeliveryOrder>> getDeliveryOrders({
+    int page = 1,
+    int limit = 10,
+    String search = '',
+    String status = '',
+  }) async {
     final token = await StorageService.getAuthToken();
     final response = await http.get(
-      Uri.parse(ApiUrls.deliveryOrders),
+      Uri.parse('${ApiUrls.deliveryOrders}?page=$page&limit=$limit&search=$search&status=$status'),
       headers: {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
@@ -84,7 +90,7 @@ class OrderRepo {
     try {
       final response = await http
           .get(
-            Uri.parse(ApiUrls.deliveryOrders),
+            Uri.parse('${ApiUrls.deliveryOrders}?page=1&limit=10&search=&status='),
             headers: {
               'Content-Type': 'application/json',
               if (token != null) 'Authorization': 'Bearer $token',
@@ -189,6 +195,9 @@ class OrderRepo {
       final decoded = jsonDecode(response.body);
       List<dynamic> list = [];
 
+      // 🔍 Debug — print raw API response to identify field names
+      debugPrint('RAW API RESPONSE: ${response.body}');
+
       if (decoded is List) {
         list = decoded;
       } else if (decoded is Map) {
@@ -199,7 +208,6 @@ class OrderRepo {
             decoded['refunds'] ??
             decoded['refundOrders'] ??
             decoded['orders'] ??
-            decoded['return'] ??
             decoded['data'];
 
         if (topLevelSource is List) {
@@ -216,6 +224,9 @@ class OrderRepo {
           if (secondarySource is List) {
             list = secondarySource;
           }
+        } else if (decoded['return'] is Map) {
+          // Handle single return order nested under 'return' key
+          list = [decoded['return']];
         }
       }
 
@@ -233,6 +244,9 @@ class OrderRepo {
     required String orderId,
     required String status,
     String? reason,
+    bool? isUndelivered,
+    bool? undeliveredWarehouseDrop,
+    String? note,
   }) async {
     final token = await StorageService.getAuthToken();
 
@@ -241,11 +255,15 @@ class OrderRepo {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+
         if (token != null) 'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
         'status': status,
         if (reason != null) 'reason': reason,
+        if (isUndelivered != null) 'isUndelivered': isUndelivered,
+        if (undeliveredWarehouseDrop != null) 'undeliveredWarehouseDrop': undeliveredWarehouseDrop,
+        if (note != null) 'note': note,
       }),
     );
 
@@ -257,6 +275,39 @@ class OrderRepo {
       return {
         'success': false,
         'message': body['message'] ?? 'Failed to update order status.',
+      };
+    }
+  }
+
+  /// Mark undelivered order as dropped at warehouse
+  static Future<Map<String, dynamic>> markWarehouseDrop({
+    required String orderId,
+  }) async {
+    final token = await StorageService.getAuthToken();
+
+    final response = await http.patch(
+      Uri.parse(ApiUrls.orderUpdateStatus(orderId)),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'status': 'undelivered',
+        'isUndelivered': true,
+        'undeliveredWarehouseDrop': true,
+        'undeliveredPlace': 'warehouse',
+      }),
+    );
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return {'success': true, 'data': body};
+    } else {
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Failed to mark warehouse drop',
       };
     }
   }
@@ -446,8 +497,7 @@ class OrderRepo {
         if (pickStatus != null) 'pickStatus': pickStatus,
         if (pickupStatus != null) 'pickupStatus': pickupStatus,
         if (refundStatus != null) 'refundStatus': refundStatus,
-        if (replacementDeliveryStatus != null)
-          'replacementDeliveryStatus': replacementDeliveryStatus,
+        if (replacementDeliveryStatus != null) 'replacementDeliveryStatus': replacementDeliveryStatus,
         if (isPicked != null) 'isPicked': isPicked,
         if (isDropped != null) 'isDropped': isDropped,
       }),

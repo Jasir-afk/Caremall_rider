@@ -5,9 +5,14 @@ class ReturnItemStatusResponse {
   ReturnItemStatusResponse({this.message, this.returnItemStatus});
 
   factory ReturnItemStatusResponse.fromJson(Map<String, dynamic> json) {
+    final rawStatus = json['returnItemStatus']?.toString();
+    final returnItemStatus = (rawStatus?.toLowerCase() == 'sent' ||
+                              rawStatus?.toLowerCase() == 'received')
+        ? 'dropped'
+        : rawStatus;
     return ReturnItemStatusResponse(
       message: json['message']?.toString(),
-      returnItemStatus: json['returnItemStatus']?.toString(),
+      returnItemStatus: returnItemStatus,
     );
   }
 

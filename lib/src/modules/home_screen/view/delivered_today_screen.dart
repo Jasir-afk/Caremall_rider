@@ -9,14 +9,12 @@ import 'package:intl/intl.dart';
 class DeliveredTodayScreen extends StatefulWidget {
   const DeliveredTodayScreen({super.key});
 
-  @override
   State<DeliveredTodayScreen> createState() => _DeliveredTodayScreenState();
 }
 
 class _DeliveredTodayScreenState extends State<DeliveredTodayScreen> {
   late Future<DashboardModel> _future;
 
-  @override
   void initState() {
     super.initState();
     _future = OrderRepo.getDeliveredTodayData();
@@ -29,7 +27,6 @@ class _DeliveredTodayScreenState extends State<DeliveredTodayScreen> {
     await _future;
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
@@ -193,7 +190,6 @@ class _SummaryCard extends StatelessWidget {
   final DashboardSummary summary;
   const _SummaryCard({required this.summary});
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -263,7 +259,6 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
-
 class _StatItem extends StatelessWidget {
   final String label;
   final String value;
@@ -274,8 +269,6 @@ class _StatItem extends StatelessWidget {
     required this.value,
     required this.icon,
   });
-
-  @override
   Widget build(BuildContext context) {
     return Row(
       children: [
@@ -360,11 +353,9 @@ class _OrderCard extends StatelessWidget {
         return const Color(0xFFF3F4F6);
     }
   }
-
   String get _statusLabel =>
       order.orderStatus.replaceAll('_', ' ').toUpperCase();
 
-  @override
   Widget build(BuildContext context) {
     final timeStr = order.deliveredAt != null
         ? DateFormat('hh:mm a').format(order.deliveredAt!.toLocal())

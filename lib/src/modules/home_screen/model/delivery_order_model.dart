@@ -9,6 +9,7 @@ class DeliveryOrder {
   final ShippingAddress shippingAddress;
   final DispatchInfo? dispatch;
   final List<OrderItem> items;
+  final bool undeliveredWarehouseDrop;
   DeliveryOrder({
     required this.id,
     required this.orderId,
@@ -20,6 +21,7 @@ class DeliveryOrder {
     required this.shippingAddress,
     this.dispatch,
     this.items = const [],
+    this.undeliveredWarehouseDrop = false,
   });
 
   factory DeliveryOrder.fromJson(Map<String, dynamic> json) {
@@ -41,6 +43,7 @@ class DeliveryOrder {
       items: rawItems
           .map((e) => OrderItem.fromJson(e as Map<String, dynamic>))
           .toList(),
+      undeliveredWarehouseDrop: json['undeliveredWarehouseDrop'] ?? false,
     );
   }
 
