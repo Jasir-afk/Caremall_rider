@@ -31,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _userAvatar;
   // ── API state ───────────
   List<DeliveryOrder> _allOrders = [];
+  List<DeliveryOrder> _allOrdersForCounts = [];
   bool _ordersLoading = true;
   String? _ordersError;
   List<ReturnOrder> _returnOrders = [];
@@ -44,6 +45,11 @@ class _HomeScreenState extends State<HomeScreen> {
   int _pageSize = 10;
   bool _hasMoreOrders = true;
   bool _loadingMore = false;
+  // Client-side visible count per tab (10 per page)
+  static const int _pageLimit = 10;
+  int _visibleNewCount = _pageLimit;
+  int _visibleHistoryCount = _pageLimit;
+  int _visibleReturnCount = _pageLimit;
   // Scroll controllers
   final ScrollController _deliveryScrollController = ScrollController();
   final ScrollController _historyScrollController = ScrollController();
@@ -138,6 +144,25 @@ class _HomeScreenState extends State<HomeScreen> {
           .catchError((e) {
             if (mounted) setState(() => _ordersError = e.toString());
           }),
+      OrderRepo.getDeliveryOrders(
+        page: 1,
+        limit: 1000,
+      )
+          .then((orders) {
+            if (mounted) {
+              setState(() {
+                _allOrdersForCounts = orders;
+              });
+            }
+          })
+          .catchError((e) {
+            debugPrint('Error fetching all orders for counts: $e');
+            if (mounted && _allOrdersForCounts.isEmpty) {
+              setState(() {
+                _allOrdersForCounts = _allOrders;
+              });
+            }
+          }),
       ReturnRepo.getReturnOrders()
           .then((returns) async {
             debugPrint('=== RETURN ORDERS FETCH START ===');
@@ -210,12 +235,14 @@ class _HomeScreenState extends State<HomeScreen> {
         _returnsLoading = false;
         _loadingMore = false;
 
+        final ordersForCalculations = _allOrdersForCounts.isNotEmpty ? _allOrdersForCounts : _allOrders;
+
         // --- Recalculate local stats for accuracy ---
         final now = DateTime.now();
         int localDelivered = 0;
         double localCod = 0;
 
-        for (final o in _allOrders) {
+        for (final o in ordersForCalculations) {
           // Check if delivered TODAY
           if (o.orderStatus.toLowerCase() == 'delivered' &&
               o.deliveredAt != null) {
@@ -240,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         // --- Merge Refund Requested Delivery Orders into Returns ---
-        final refundRequestedFromDelivery = _allOrders
+        final refundRequestedFromDelivery = ordersForCalculations
             .where((o) {
               final s = o.orderStatus.toLowerCase();
               return s == 'refund_requested' ||
@@ -292,15 +319,22 @@ class _HomeScreenState extends State<HomeScreen> {
     'return_completed',
   };
 
-  List<DeliveryOrder> get _newOrders => _allOrders
+  List<DeliveryOrder> get _baseOrders => _allOrdersForCounts.isNotEmpty ? _allOrdersForCounts : _allOrders;
+
+  List<DeliveryOrder> get _newOrders => _baseOrders
       .where((o) => _newStatuses.contains(o.orderStatus.toLowerCase()))
       .toList();
-  List<DeliveryOrder> get _inTransitOrders => _allOrders
+  List<DeliveryOrder> get _inTransitOrders => _baseOrders
       .where((o) => _transitStatuses.contains(o.orderStatus.toLowerCase()))
       .toList();
-  List<DeliveryOrder> get _historyOrders => _allOrders
+  List<DeliveryOrder> get _historyOrders => _baseOrders
       .where((o) => _historyStatuses.contains(o.orderStatus.toLowerCase()))
       .toList();
+
+  // For counts, use same source (no longer separate – kept for tab badge usage)
+  List<DeliveryOrder> get _newOrdersForCount => _newOrders;
+  List<DeliveryOrder> get _inTransitOrdersForCount => _inTransitOrders;
+  List<DeliveryOrder> get _historyOrdersForCount => _historyOrders;
 
 List<ReturnOrder> get _activeReturnOrders => _returnOrders.where((o) {
   final status = o.orderStatus.toLowerCase();
@@ -346,7 +380,7 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
   /// Today's delivered COD orders for breakdown
   List<DeliveryOrder> get _todayCodOrders {
     final now = DateTime.now();
-    return _allOrders.where((o) {
+    return _baseOrders.where((o) {
       if (o.orderStatus.toLowerCase() != 'delivered' || o.deliveredAt == null) {
         return false;
       }
@@ -493,12 +527,12 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
                       ),
                       child: Row(
                         children: [
-                          _buildTab('New', _newOrders.length, 0),
-                          _buildTab('In Transit', _inTransitOrders.length, 1),
+                          _buildTab('New', _newOrdersForCount.length, 0),
+                          _buildTab('In Transit', _inTransitOrdersForCount.length, 1),
                           _buildTab('Returns', _activeReturnOrders.length, 2),
                           _buildTab(
                             'History',
-                            _historyOrders.length + _historyReturnOrders.length,
+                            _historyOrdersForCount.length + _historyReturnOrders.length,
                             3,
                           ),
                         ],
@@ -750,7 +784,13 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
     final bool isSelected = _selectedTab == index;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = index),
+        onTap: () => setState(() {
+          _selectedTab = index;
+          // Reset visible counts on tab switch
+          _visibleNewCount = _pageLimit;
+          _visibleHistoryCount = _pageLimit;
+          _visibleReturnCount = _pageLimit;
+        }),
         child: Container(
           padding: EdgeInsets.symmetric(vertical: 8.h),
           decoration: BoxDecoration(
@@ -779,7 +819,7 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
                       : Colors.grey[600]!,
                   maxLines: 1,
                 ),
-                if (count > 0)
+                if (count >= 0)
                   Positioned(
                     top: -10.h,
                     right: -14.w,
@@ -841,78 +881,51 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
         ),
       );
     }
-    final orders = _currentOrders;
+    final allOrders = _currentOrders;
+    final orders = allOrders.take(_visibleNewCount).toList();
+    final bool showLoadMore = orders.length < allOrders.length ||
+        (_hasMoreOrders && allOrders.length >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
-      child: Column(
-        children: [
-          Expanded(
-            child: orders.isEmpty
-                ? SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: SizedBox(
-                      height: 400.h,
-                      child: Center(
-                        child: AppText(
-                          text: 'No orders here',
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[500]!,
-                        ),
-                      ),
-                    ),
-                  )
-                : ListView.separated(
-                    controller: _deliveryScrollController,
-                    padding: EdgeInsets.all(16.w),
-                    itemCount: orders.length,
-                    separatorBuilder: (_, _) => SizedBox(height: 12.h),
-                    itemBuilder: (context, index) => _buildOrderCard(orders[index]),
-                  ),
-          ),
-          if (_hasMoreOrders && orders.length > 10 && _hasScrolledBeyondFirstPage)
-            Padding(
-              padding: EdgeInsets.all(16.w),
+      child: allOrders.isEmpty
+          ? SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _loadingMore
-                      ? null
-                      : () {
-                          setState(() {
-                            _currentPage++;
-                          });
-                          _fetchOrders(loadMore: true);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primarycolor,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    elevation: 0,
+                height: 400.h,
+                child: Center(
+                  child: AppText(
+                    text: 'No orders here',
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[500]!,
                   ),
-                  child: _loadingMore
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : AppText(
-                          text: 'Load More',
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
                 ),
               ),
+            )
+          : ListView.separated(
+              controller: _deliveryScrollController,
+              padding: EdgeInsets.all(16.w),
+              itemCount: orders.length + (showLoadMore ? 1 : 0),
+              separatorBuilder: (_, _) => SizedBox(height: 12.h),
+              itemBuilder: (context, index) {
+                if (showLoadMore && index == orders.length) {
+                  return _AnimatedLoadMoreButton(
+                    loading: _loadingMore,
+                    onPressed: () {
+                      setState(() {
+                        if (_visibleNewCount < allOrders.length) {
+                          _visibleNewCount += _pageLimit;
+                        } else {
+                          _currentPage++;
+                          _fetchOrders(loadMore: true);
+                        }
+                      });
+                    },
+                  );
+                }
+                return _buildOrderCard(orders[index]);
+              },
             ),
-        ],
-      ),
     );
   }
 
@@ -946,89 +959,60 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
         ),
       );
     }
-    final delOrders = _historyOrders;
-    final retOrders = _historyReturnOrders;
-    // Combine lists with return orders at the top
-    final combinedOrders = [...retOrders, ...delOrders];
+    final allDel = _historyOrders;
+    final allRet = _historyReturnOrders;
+    final allCombined = [...allRet, ...allDel];
+    final totalAll = allCombined.length;
+    final combinedOrders = allCombined.take(_visibleHistoryCount).toList();
     final totalCount = combinedOrders.length;
+    final bool showLoadMore = totalCount < totalAll ||
+        (_hasMoreOrders && totalAll >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
-      child: Column(
-        children: [
-          Expanded(
-            child: totalCount == 0
-                ? SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: SizedBox(
-                      height: 400.h,
-                      child: Center(
-                        child: AppText(
-                          text: 'No history here',
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[500]!,
-                        ),
-                      ),
-                    ),
-                  )
-                : ListView.separated(
-                    controller: _historyScrollController,
-                    padding: EdgeInsets.all(16.w),
-                    itemCount: totalCount,
-                    separatorBuilder: (_, _) => SizedBox(height: 12.h),
-                    itemBuilder: (context, index) {
-                      final order = combinedOrders[index];
-                      if (order is ReturnOrder) {
-                        return _buildReturnCard(order);
-                      } else {
-                        return _buildOrderCard(order as DeliveryOrder);
-                      }
-                    },
-                  ),
-          ),
-          if (_hasMoreOrders && totalCount > 10 && _hasScrolledBeyondFirstPage)
-            Padding(
-              padding: EdgeInsets.all(16.w),
+      child: totalAll == 0
+          ? SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _loadingMore
-                      ? null
-                      : () {
-                          setState(() {
-                            _currentPage++;
-                          });
-                          _fetchOrders(loadMore: true);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primarycolor,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    elevation: 0,
+                height: 400.h,
+                child: Center(
+                  child: AppText(
+                    text: 'No history here',
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[500]!,
                   ),
-                  child: _loadingMore
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : AppText(
-                          text: 'Load More',
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
                 ),
               ),
+            )
+          : ListView.separated(
+              controller: _historyScrollController,
+              padding: EdgeInsets.all(16.w),
+              itemCount: totalCount + (showLoadMore ? 1 : 0),
+              separatorBuilder: (_, _) => SizedBox(height: 12.h),
+              itemBuilder: (context, index) {
+                if (showLoadMore && index == totalCount) {
+                  return _AnimatedLoadMoreButton(
+                    loading: _loadingMore,
+                    onPressed: () {
+                      setState(() {
+                        if (_visibleHistoryCount < totalAll) {
+                          _visibleHistoryCount += _pageLimit;
+                        } else {
+                          _currentPage++;
+                          _fetchOrders(loadMore: true);
+                        }
+                      });
+                    },
+                  );
+                }
+                final order = combinedOrders[index];
+                if (order is ReturnOrder) {
+                  return _buildReturnCard(order);
+                } else {
+                  return _buildOrderCard(order as DeliveryOrder);
+                }
+              },
             ),
-        ],
-      ),
     );
   }
 
@@ -1062,8 +1046,8 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
         ),
       );
     }
-    final activeReturns = _activeReturnOrders;
-    if (activeReturns.isEmpty) {
+    final allReturns = _activeReturnOrders;
+    if (allReturns.isEmpty) {
       return Center(
         child: AppText(
           text: 'No active returns',
@@ -1073,61 +1057,34 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
         ),
       );
     }
+    final activeReturns = allReturns.take(_visibleReturnCount).toList();
+    final bool showLoadMore = activeReturns.length < allReturns.length ||
+        (_hasMoreOrders && allReturns.length >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
-      child: Column(
-        children: [
-          Expanded(
-            child: ListView.separated(
-              controller: _returnScrollController,
-              padding: EdgeInsets.all(16.w),
-              itemCount: activeReturns.length,
-              separatorBuilder: (_, _) => SizedBox(height: 12.h),
-              itemBuilder: (context, index) => _buildReturnCard(activeReturns[index]),
-            ),
-          ),
-          if (_hasMoreOrders && activeReturns.length > 10 && _hasScrolledBeyondFirstPage)
-            Padding(
-              padding: EdgeInsets.all(16.w),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _loadingMore
-                      ? null
-                      : () {
-                          setState(() {
-                            _currentPage++;
-                          });
-                          _fetchOrders(loadMore: true);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primarycolor,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _loadingMore
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : AppText(
-                          text: 'Load More',
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                ),
-              ),
-            ),
-        ],
+      child: ListView.separated(
+        controller: _returnScrollController,
+        padding: EdgeInsets.all(16.w),
+        itemCount: activeReturns.length + (showLoadMore ? 1 : 0),
+        separatorBuilder: (_, _) => SizedBox(height: 12.h),
+        itemBuilder: (context, index) {
+          if (showLoadMore && index == activeReturns.length) {
+            return _AnimatedLoadMoreButton(
+              loading: _loadingMore,
+              onPressed: () {
+                setState(() {
+                  if (_visibleReturnCount < allReturns.length) {
+                    _visibleReturnCount += _pageLimit;
+                  } else {
+                    _currentPage++;
+                    _fetchOrders(loadMore: true);
+                  }
+                });
+              },
+            );
+          }
+          return _buildReturnCard(activeReturns[index]);
+        },
       ),
     );
   }
@@ -1907,6 +1864,109 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
       isSelected ? activeIcon : icon,
       color: isSelected ? Colors.white : Colors.grey[400],
       size: 22.sp,
+    );
+  }
+}
+
+// ─── Animated Load More Button ────────────────────────────────────────────────
+
+class _AnimatedLoadMoreButton extends StatefulWidget {
+  final bool loading;
+  final VoidCallback onPressed;
+
+  const _AnimatedLoadMoreButton({
+    required this.loading,
+    required this.onPressed,
+  });
+
+  @override
+  State<_AnimatedLoadMoreButton> createState() =>
+      _AnimatedLoadMoreButtonState();
+}
+
+class _AnimatedLoadMoreButtonState extends State<_AnimatedLoadMoreButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.4),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    // Small delay so it appears after the list is rendered
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: widget.loading ? null : widget.onPressed,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primarycolor,
+                side: BorderSide(color: AppColors.primarycolor, width: 1.5),
+                padding: EdgeInsets.symmetric(vertical: 13.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                backgroundColor: AppColors.primarycolor.withValues(alpha: 0.04),
+              ),
+              child: widget.loading
+                  ? SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primarycolor,
+                        ),
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.expand_more_rounded,
+                          size: 18.sp,
+                          color: AppColors.primarycolor,
+                        ),
+                        SizedBox(width: 6.w),
+                        AppText(
+                          text: 'Load More',
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primarycolor,
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
