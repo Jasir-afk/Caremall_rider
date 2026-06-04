@@ -588,4 +588,38 @@ class OrderRepo {
       };
     }
   }
+
+  /// Update replacement pickup status.
+  /// replacementPickupStatus: 'replacement_pick' (rider picks from hub)
+  ///                          'replacement_delivered' (delivered to customer)
+  /// Response on 'replacement_delivered' includes walletCredited & walletBalance.
+  static Future<Map<String, dynamic>> updateReplacementPickupStatus({
+    required String returnId,
+    required String replacementPickupStatus,
+  }) async {
+    final token = await StorageService.getAuthToken();
+
+    final response = await http.patch(
+      Uri.parse(ApiUrls.returnUpdateReplacementPickupStatus(returnId)),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'replacementPickupStatus': replacementPickupStatus,
+      }),
+    );
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return {'success': true, 'data': body, ...body};
+    } else {
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Failed to update replacement pickup status.',
+      };
+    }
+  }
 }

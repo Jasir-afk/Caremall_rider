@@ -61,6 +61,8 @@ class ApiUrls {
       '$baseURL/api/v1/rider/returns/$id/upload-photo'; // POST – upload return photo
   static String returnUpdateReplacementStatus(String id) =>
       '$baseURL/api/v1/rider/returns/$id/replacement-status'; // PATCH – update replacement delivery status
+  static String returnUpdateReplacementPickupStatus(String id) =>
+      '$baseURL/api/v1/rider/returns/$id/replacement-pickup-status'; // PATCH – update replacement pickup status
 
   // Wallet
   static String get wallet =>

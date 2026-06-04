@@ -57,7 +57,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // Scroll state
   bool _hasScrolledBeyondFirstPage = false;
 
-
   void initState() {
     super.initState();
     _loadUserData();
@@ -125,10 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     // Fetch delivery orders, return orders and dashboard stats in parallel
     await Future.wait([
-      OrderRepo.getDeliveryOrders(
-        page: _currentPage,
-        limit: _pageSize,
-      )
+      OrderRepo.getDeliveryOrders(page: _currentPage, limit: _pageSize)
           .then((orders) {
             if (mounted) {
               setState(() {
@@ -144,10 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .catchError((e) {
             if (mounted) setState(() => _ordersError = e.toString());
           }),
-      OrderRepo.getDeliveryOrders(
-        page: 1,
-        limit: 1000,
-      )
+      OrderRepo.getDeliveryOrders(page: 1, limit: 1000)
           .then((orders) {
             if (mounted) {
               setState(() {
@@ -171,9 +164,13 @@ class _HomeScreenState extends State<HomeScreen> {
             for (int i = 0; i < returns.length; i++) {
               try {
                 final r = returns[i];
-                debugPrint('Fetching detail for ${r.returnId} (id: ${r.id}) (current returnItemStatus: ${r.returnItemStatus})...');
+                debugPrint(
+                  'Fetching detail for ${r.returnId} (id: ${r.id}) (current returnItemStatus: ${r.returnItemStatus})...',
+                );
                 final detail = await ReturnRepo.getReturnDetail(r.id);
-                debugPrint('Detail for ${r.returnId}: orderStatus=${detail.orderStatus}, returnItemStatus=${detail.returnItemStatus}, isDropped=${detail.isDropped}');
+                debugPrint(
+                  'Detail for ${r.returnId}: orderStatus=${detail.orderStatus}, returnItemStatus=${detail.returnItemStatus}, isDropped=${detail.isDropped}',
+                );
                 returns[i] = detail;
                 debugPrint('Updated order at index $i');
               } catch (e) {
@@ -235,7 +232,9 @@ class _HomeScreenState extends State<HomeScreen> {
         _returnsLoading = false;
         _loadingMore = false;
 
-        final ordersForCalculations = _allOrdersForCounts.isNotEmpty ? _allOrdersForCounts : _allOrders;
+        final ordersForCalculations = _allOrdersForCounts.isNotEmpty
+            ? _allOrdersForCounts
+            : _allOrders;
 
         // --- Recalculate local stats for accuracy ---
         final now = DateTime.now();
@@ -306,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'shipped',
     'out_for_delivery',
     'picked_up',
-    'undelivered'
+    'undelivered',
   };
   static const _historyStatuses = {
     'delivered',
@@ -319,7 +318,8 @@ class _HomeScreenState extends State<HomeScreen> {
     'return_completed',
   };
 
-  List<DeliveryOrder> get _baseOrders => _allOrdersForCounts.isNotEmpty ? _allOrdersForCounts : _allOrders;
+  List<DeliveryOrder> get _baseOrders =>
+      _allOrdersForCounts.isNotEmpty ? _allOrdersForCounts : _allOrders;
 
   List<DeliveryOrder> get _newOrders => _baseOrders
       .where((o) => _newStatuses.contains(o.orderStatus.toLowerCase()))
@@ -336,46 +336,56 @@ class _HomeScreenState extends State<HomeScreen> {
   List<DeliveryOrder> get _inTransitOrdersForCount => _inTransitOrders;
   List<DeliveryOrder> get _historyOrdersForCount => _historyOrders;
 
-List<ReturnOrder> get _activeReturnOrders => _returnOrders.where((o) {
-  final status = o.orderStatus.toLowerCase();
-  final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(' ', '_');
-  final replStatus = o.replacementDeliveryStatus?.toLowerCase();
-  final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+  List<ReturnOrder> get _activeReturnOrders => _returnOrders.where((o) {
+    final status = o.orderStatus.toLowerCase();
+    final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+      ' ',
+      '_',
+    );
+    final replStatus = o.replacementDeliveryStatus?.toLowerCase();
+    final isReplacement = o.returnType?.toLowerCase() == 'replacement';
 
-  // Rejected but NOT yet dropped → still active
-  if (status == 'rejected' && itemStatus != 'rejected_dropped') return true;
+    // Rejected but NOT yet dropped → still active
+    if (status == 'rejected' && itemStatus != 'rejected_dropped') return true;
 
-  if (itemStatus == 'rejected_dropped') return false;
-  if (_historyStatuses.contains(status)) return false;
+    if (itemStatus == 'rejected_dropped') return false;
+    if (_historyStatuses.contains(status)) return false;
 
-  // Replacement completed when delivered to customer
-  if (isReplacement &&
-      (replStatus == 'completed' || replStatus == 'delivered')) { return false; }
+    // Replacement completed when delivered to customer
+    if (isReplacement &&
+        (replStatus == 'completed' || replStatus == 'delivered')) {
+      return false;
+    }
 
-  return true;
-}).toList();
+    return true;
+  }).toList();
 
-List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
-  final status = o.orderStatus.toLowerCase();
-  final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(' ', '_');
-  final replStatus = o.replacementDeliveryStatus?.toLowerCase();
-  final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+  List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
+    final status = o.orderStatus.toLowerCase();
+    final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+      ' ',
+      '_',
+    );
+    final replStatus = o.replacementDeliveryStatus?.toLowerCase();
+    final isReplacement = o.returnType?.toLowerCase() == 'replacement';
 
-  // Rejected: only move to history when rider has returned item to customer (rejected_dropped)
-  if (status == 'rejected' && itemStatus == 'rejected_dropped') return true;
-  // Rejected but not yet returned to customer → still active (not in history)
-  if (status == 'rejected') return false;
+    // Rejected: only move to history when rider has returned item to customer (rejected_dropped)
+    if (status == 'rejected' && itemStatus == 'rejected_dropped') return true;
+    // Rejected but not yet returned to customer → still active (not in history)
+    if (status == 'rejected') return false;
 
-  if (_historyStatuses.contains(status)) return true;
+    if (_historyStatuses.contains(status)) return true;
 
-  if (itemStatus == 'rejected_dropped') return true;
+    if (itemStatus == 'rejected_dropped') return true;
 
-  // Replacement completed when delivered to customer
-  if (isReplacement &&
-      (replStatus == 'completed' || replStatus == 'delivered')) { return true; }
+    // Replacement completed when delivered to customer
+    if (isReplacement &&
+        (replStatus == 'completed' || replStatus == 'delivered')) {
+      return true;
+    }
 
-  return false;
-}).toList();
+    return false;
+  }).toList();
 
   /// Today's delivered COD orders for breakdown
   List<DeliveryOrder> get _todayCodOrders {
@@ -528,11 +538,16 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
                       child: Row(
                         children: [
                           _buildTab('New', _newOrdersForCount.length, 0),
-                          _buildTab('In Transit', _inTransitOrdersForCount.length, 1),
+                          _buildTab(
+                            'In Transit',
+                            _inTransitOrdersForCount.length,
+                            1,
+                          ),
                           _buildTab('Returns', _activeReturnOrders.length, 2),
                           _buildTab(
                             'History',
-                            _historyOrdersForCount.length + _historyReturnOrders.length,
+                            _historyOrdersForCount.length +
+                                _historyReturnOrders.length,
                             3,
                           ),
                         ],
@@ -866,7 +881,11 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
+                  Icon(
+                    Icons.wifi_off_rounded,
+                    size: 48.sp,
+                    color: Colors.grey[400],
+                  ),
                   SizedBox(height: 12.h),
                   AppText(
                     text: 'Could not load orders',
@@ -883,7 +902,8 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
     }
     final allOrders = _currentOrders;
     final orders = allOrders.take(_visibleNewCount).toList();
-    final bool showLoadMore = orders.length < allOrders.length ||
+    final bool showLoadMore =
+        orders.length < allOrders.length ||
         (_hasMoreOrders && allOrders.length >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
@@ -944,7 +964,11 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
+                  Icon(
+                    Icons.wifi_off_rounded,
+                    size: 48.sp,
+                    color: Colors.grey[400],
+                  ),
                   SizedBox(height: 12.h),
                   AppText(
                     text: 'Could not load history',
@@ -965,8 +989,8 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
     final totalAll = allCombined.length;
     final combinedOrders = allCombined.take(_visibleHistoryCount).toList();
     final totalCount = combinedOrders.length;
-    final bool showLoadMore = totalCount < totalAll ||
-        (_hasMoreOrders && totalAll >= _pageSize);
+    final bool showLoadMore =
+        totalCount < totalAll || (_hasMoreOrders && totalAll >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
       child: totalAll == 0
@@ -1031,7 +1055,11 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
+                  Icon(
+                    Icons.wifi_off_rounded,
+                    size: 48.sp,
+                    color: Colors.grey[400],
+                  ),
                   SizedBox(height: 12.h),
                   AppText(
                     text: 'Could not load returns',
@@ -1058,7 +1086,8 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
       );
     }
     final activeReturns = allReturns.take(_visibleReturnCount).toList();
-    final bool showLoadMore = activeReturns.length < allReturns.length ||
+    final bool showLoadMore =
+        activeReturns.length < allReturns.length ||
         (_hasMoreOrders && allReturns.length >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
@@ -1267,9 +1296,10 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
                         // Rejected orders: only complete when rider has returned item to customer
                         (isRejected && itemStatusClean == 'rejected_dropped') ||
                         // Normal (non-rejected) refund/replacement orders
-                        (!isRejected && _historyStatuses.contains(
-                          ret.orderStatus.toLowerCase(),
-                        )) ||
+                        (!isRejected &&
+                            _historyStatuses.contains(
+                              ret.orderStatus.toLowerCase(),
+                            )) ||
                         // Normal refund dropped at hub = completed
                         (!isRejected &&
                             ret.returnType?.toLowerCase() != 'replacement' &&
@@ -1285,7 +1315,8 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
                     if (isCompleted) {
                       final bool showAsRejectedDropped =
                           itemStatusClean == 'rejected_dropped';
-                      final bool isReplacement = ret.returnType?.toLowerCase() == 'replacement';
+                      final bool isReplacement =
+                          ret.returnType?.toLowerCase() == 'replacement';
                       final String completedText = showAsRejectedDropped
                           ? (isReplacement ? 'Replaced' : 'Refunded')
                           : (isReplacement ? 'Replaced' : 'Refunded');
@@ -1360,8 +1391,8 @@ List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
                           text: isRejected
                               ? 'Start Delivery'
                               : ret.returnType?.toLowerCase() == 'replacement'
-                                  ? 'Start Replacement'
-                                  : 'Start Refund',
+                              ? 'Start Replacement'
+                              : 'Start Refund',
                           fontSize: 13.sp,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,

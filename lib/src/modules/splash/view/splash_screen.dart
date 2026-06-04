@@ -1,5 +1,3 @@
-import 'package:care_mall_rider/app/commenwidget/apptext.dart';
-import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
 import 'package:care_mall_rider/src/modules/auth/view/login_screen.dart';
@@ -11,12 +9,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-  @override
+
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  @override
+
   void initState() {
     super.initState();
     _navigate();
@@ -50,7 +48,6 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,

@@ -68,4 +68,16 @@ class ReturnRepo {
       pickupStatus: pickupStatus,
     );
   }
+
+  /// PATCH /api/v1/rider/returns/:id/replacement-pickup-status
+  /// replacementPickupStatus: 'replacement_pick' | 'replacement_delivered'
+  static Future<Map<String, dynamic>> updateReplacementPickupStatus({
+  required String returnId,
+  required String replacementPickupStatus,
+}){
+  return OrderRepo.updateReplacementPickupStatus(
+    returnId: returnId,
+    replacementPickupStatus: replacementPickupStatus,
+  );
+}
 }

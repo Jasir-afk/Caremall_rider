@@ -12,8 +12,6 @@ class WalletController extends GetxController {
   var walletData = Rxn<WalletModel>();
   var withdrawalRequests = <WithdrawalRequest>[].obs;
   var errorMessage = Rxn<String>();
-
-  @override
   void onInit() {
     super.onInit();
     fetchWalletData();

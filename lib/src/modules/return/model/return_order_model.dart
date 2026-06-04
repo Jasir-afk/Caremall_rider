@@ -147,8 +147,9 @@ class ReturnOrder {
         parsedRefundAmount;
 
     final rawReturnItemStatus = json['returnItemStatus']?.toString();
-    final returnItemStatus = (rawReturnItemStatus?.toLowerCase() == 'sent' ||
-                              rawReturnItemStatus?.toLowerCase() == 'received')
+    final returnItemStatus =
+        (rawReturnItemStatus?.toLowerCase() == 'sent' ||
+            rawReturnItemStatus?.toLowerCase() == 'received')
         ? 'dropped'
         : rawReturnItemStatus;
 
@@ -196,6 +197,9 @@ class ReturnOrder {
     String? replacementDeliveryStatus,
     bool? isPicked,
     bool? isDropped,
+    String? pickupStatus,
+    String? pickStatus,
+    String? refundStatus,
   }) {
     return ReturnOrder(
       id: id,
@@ -207,10 +211,10 @@ class ReturnOrder {
       customerPhone: customerPhone,
       address: address,
       createdAt: createdAt,
-      pickupStatus: pickupStatus,
+      pickupStatus: pickupStatus ?? this.pickupStatus, // ✅ add this
       returnItemStatus: returnItemStatus ?? this.returnItemStatus,
-      refundStatus: refundStatus,
-      pickStatus: pickStatus,
+      refundStatus: refundStatus ?? this.refundStatus, // ✅ add this
+      pickStatus: pickStatus ?? this.pickStatus, // ✅ add this
       replacementDeliveryStatus:
           replacementDeliveryStatus ?? this.replacementDeliveryStatus,
       pickupPhotos: pickupPhotos,

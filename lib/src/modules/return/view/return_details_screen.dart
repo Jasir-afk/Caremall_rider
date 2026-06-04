@@ -24,6 +24,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
   bool _detailsConfirmed = false;
   String? _returnMethod;
   bool _replacementAllowed = false;
+  bool _hubPickConfirmed = false; // true after rider confirms pickup from hub
 
   late AnimationController _fadeCtrl;
   late Animation<double> _fadeAnim;
@@ -38,7 +39,6 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
   static const Color _orange = Color(0xFFFF8C00);
   static const Color _red = Color(0xFFE53935);
   static const Color _blue = Color(0xFF1565C0);
-
 
   void initState() {
     super.initState();
@@ -65,20 +65,24 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       if (mounted) {
         setState(() {
           _detail = detail;
-          // Always derive from server data.
-          // _replacementAllowed = true only when phase-2 delivery has started
-          // (replacementDeliveryStatus is 'sent' or 'received').
-          // Rejected replacements NEVER enter phase 2 — they have their own
-          // 3-step rejected flow, so we exclude them here.
+          final serverReplStatus = detail.replacementDeliveryStatus
+              ?.toLowerCase();
+          if (serverReplStatus != 'received') {
+            _hubPickConfirmed = false; // safe to reset, server has moved on
+          }
+          // else: keep _hubPickConfirmed = true so UI stays on drop_off step
           final isRejected = detail.orderStatus.toLowerCase().contains(
             'rejected',
           );
+          final replStatus = detail.replacementDeliveryStatus?.toLowerCase();
           _replacementAllowed =
               detail.returnType?.toLowerCase() == 'replacement' &&
               !isRejected &&
               detail.isDropped &&
-              detail.replacementDeliveryStatus != null &&
-              detail.replacementDeliveryStatus!.toLowerCase() != 'pending';
+              (replStatus == 'received' ||
+                  replStatus == 'picked' ||
+                  replStatus == 'completed' ||
+                  replStatus == 'delivered');
           _initMethod();
         });
         _fadeCtrl.forward(from: 0);
@@ -115,47 +119,53 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     final isRejected = ret.orderStatus.toLowerCase().contains('rejected');
 
     if (isReplacement && isRejected) {
-      // ── Replacement rejected by admin: pick from hub → return to customer ───
+      final isRejectedReceived =
+          ret.orderStatus.toLowerCase() == 'rejected_received' ||
+          itemStatus == 'rejected_received';
       if (itemStatus.contains('rejected_dropped')) {
-        _returnMethod = null; // Replacement Rejected Closed — done
+        _returnMethod = null;
       } else if (itemStatus.contains('rejected_picked')) {
-        _returnMethod = 'drop_off'; // Return item to customer
+        _returnMethod = 'drop_off';
+      } else if (isRejectedReceived) {
+        _returnMethod = 'pickup';
       } else {
-        _returnMethod = 'pickup'; // Receive item from hub
+        _returnMethod = null;
       }
     } else if (isReplacement) {
-      // ── Replacement: unified flow ──────────────────────────────────────────
-      // _replacementAllowed is true only when replacementDeliveryStatus is
-      // 'sent' or 'received' (set by warehouse card tap). Rejected replacements
-      // are already handled above and never reach here.
       if (_replacementAllowed) {
-        // Phase 2: hub → customer.
-        // replStatus='received' → item picked from hub, heading to customer (drop_off pending)
-        // replStatus='completed'/'delivered' or orderStatus='completed' → delivered done
+        // Phase 2: hub → customer
         if (replStatus == 'completed' ||
             replStatus == 'delivered' ||
             orderStatus == 'completed') {
           _returnMethod = null; // Delivered — done
-        } else {
+        } else if (replStatus == 'picked' || _hubPickConfirmed) {
           _returnMethod = 'drop_off'; // Picked from hub → deliver to customer
+          _detailsConfirmed = false; // reset checkbox for next step
+        } else {
+          _returnMethod = 'pickup'; // 'received' → rider must pick first
         }
       } else {
         // Phase 1: customer → hub
         if (!isPicked) {
-          _returnMethod = 'pickup'; // Pick from Customer
+          _returnMethod = 'pickup';
         } else if (!isDropped) {
-          _returnMethod = 'drop_off'; // Drop at Hub
+          _returnMethod = 'drop_off';
         } else {
-          _returnMethod = null; // At hub, awaiting admin / warehouse card
+          _returnMethod = null;
         }
       }
     } else if (isRejected) {
+      final isRejectedReceived =
+          ret.orderStatus.toLowerCase() == 'rejected_received' ||
+          itemStatus == 'rejected_received';
       if (itemStatus == 'rejected_dropped') {
         _returnMethod = null;
       } else if (itemStatus == 'rejected_picked') {
         _returnMethod = 'drop_off';
-      } else {
+      } else if (isRejectedReceived) {
         _returnMethod = 'pickup';
+      } else {
+        _returnMethod = null;
       }
     } else {
       if (!isPicked) {
@@ -182,47 +192,48 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     );
     final isRejected = orderStatus.contains('rejected');
 
-    // ── Replacement rejected by admin: 3-step timeline ─────────────────────
-    // Step 0: Received from Hub | Step 1: Returned to Customer | Step 2: Closed
     if (isReplacement && isRejected) {
-      if (itemStatus.contains('rejected_dropped')) {
-        return 3; // all done / closed
-      }
-      if (itemStatus.contains('rejected_picked')) {
-        return 1; // returning to customer
-      }
-      return 0; // waiting to pick from hub
+      if (itemStatus.contains('rejected_dropped')) return 3;
+      if (itemStatus.contains('rejected_picked')) return 1;
+      if (orderStatus == 'rejected_received' ||
+          itemStatus == 'rejected_received')
+        return 0;
+      return -1;
     }
 
     if (isRejected) {
-      if (itemStatus == 'rejected_dropped' || itemStatus == 'item_delivered') {
+      if (itemStatus == 'rejected_dropped' || itemStatus == 'item_delivered')
         return 2;
-      }
       if (itemStatus == 'rejected_picked') return 1;
-      return 0;
+      if (orderStatus == 'rejected_received' ||
+          itemStatus == 'rejected_received')
+        return 0;
+      return -1;
     }
 
-    // ── Replacement delivery phase (hub → customer): 2-step timeline ─────────
-    // replStatus='received' → step 1 (picked from hub, heading to customer)
-    // replStatus='completed'/'delivered' or orderStatus='completed' → step 2 (done)
+    // ── Replacement delivery phase (hub → customer)
     if (isReplacement && ret.isDropped && _replacementAllowed) {
       if (replStatus == 'completed' ||
           replStatus == 'delivered' ||
-          orderStatus == 'completed') return 2;
-      return 1; // replStatus='received': picked from hub, heading to customer
+          orderStatus == 'completed') {
+        return 2;
+      }
+      if (replStatus == 'picked' || _hubPickConfirmed) {
+        return 1; // picked from hub
+      }
+      return 0; // 'received' → not started yet
     }
 
-    // ── Replacement collection phase (customer → hub): 2-step timeline ───────
+    // ── Replacement collection phase (customer → hub)
     if (isReplacement && !ret.isDropped) {
-      // Treat 'sent' status as dropped for timeline purposes
-      if (itemStatus == 'sent') return 2; // already dropped at hub
+      if (itemStatus == 'sent') return 2;
       if (ret.isPicked) return 1;
       return 0;
     }
 
-    // ── Replacement: item at hub, awaiting admin approval ─────────────────────
+    // ── Replacement: item at hub, awaiting admin approval
     if (isReplacement && ret.isDropped && !_replacementAllowed) {
-      return 2; // both collection steps done
+      return 2;
     }
 
     if (orderStatus == 'completed' ||
@@ -235,14 +246,12 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       return 3;
     }
 
-    // Treat 'sent' status as dropped for timeline purposes
     if (ret.isDropped || itemStatus == 'sent') return 2;
     if (ret.isPicked) return 1;
     return 0;
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
-
   Widget build(BuildContext context) {
     final isReplacement =
         (_detail?.returnType?.toLowerCase() == 'replacement' ||
@@ -319,7 +328,11 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.cloud_off_rounded, size: 52.sp, color: Colors.grey[300]),
+                Icon(
+                  Icons.cloud_off_rounded,
+                  size: 52.sp,
+                  color: Colors.grey[300],
+                ),
                 SizedBox(height: 16.h),
                 Text(
                   'Could not load details',
@@ -344,32 +357,37 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
 
   Widget _buildContent() {
     final ret = _display;
-    // Replacement delivery is done when status is 'completed' or 'delivered'.
-    // Note: 'received' = rider picked item from hub (intermediate step — confirm button still needed).
-    final replDeliveryDone =
-        _display.replacementDeliveryStatus?.toLowerCase() == 'completed' ||
-        _display.replacementDeliveryStatus?.toLowerCase() == 'delivered';
-    // final itemStatus = (_display.returnItemStatus?.toLowerCase() ?? '').replaceAll(' ', '_');
-    // final bool isRejectedDropped = itemStatus == 'rejected_dropped';
-    // Treat 'sent' status as dropped for confirm button logic
-    final isEffectivelyDropped = _display.isDropped ||
-        _display.returnItemStatus?.toLowerCase() == 'sent';
+    final replStatus = _display.replacementDeliveryStatus?.toLowerCase();
+    final isReplacementPhase2 =
+        _display.returnType?.toLowerCase() == 'replacement' &&
+        _display.isDropped &&
+        _replacementAllowed;
+
     final bool showConfirm =
-        ((isEffectivelyDropped == false &&
-                !_display.orderStatus.toLowerCase().contains('rejected')) ||
-            (_display.returnType?.toLowerCase() == 'replacement' &&
-                _display.orderStatus.toLowerCase() == 'approved' &&
-                !replDeliveryDone &&
-                _replacementAllowed) || // only show after "Received" is tapped
-            (_display.orderStatus.toLowerCase().contains('rejected') &&
-                _returnMethod != null)) &&
         !(_display.orderStatus.toLowerCase() == 'cancelled' ||
             _display.orderStatus.toLowerCase() == 'failed' ||
             _display.orderStatus.toLowerCase() == 'completed' ||
             _display.orderStatus.toLowerCase() == 'refund_completed' ||
             _display.orderStatus.toLowerCase() == 'returned' ||
             _display.orderStatus.toLowerCase() == 'refunded' ||
-            _display.orderStatus.toLowerCase() == 'return_completed');
+            _display.orderStatus.toLowerCase() == 'return_completed') &&
+        (
+        // Phase 2 replacement delivery: show when replStatus is 'received' or 'picked'
+        (isReplacementPhase2 &&
+                (replStatus == 'received' ||
+                    replStatus == 'picked' ||
+                    _hubPickConfirmed)) ||
+            // Standard refund: not yet dropped
+            (!_display.isDropped &&
+                _display.returnType?.toLowerCase() != 'replacement' &&
+                !_display.orderStatus.toLowerCase().contains('rejected')) ||
+            // Rejected flow: has a pending action
+            (_display.orderStatus.toLowerCase().contains('rejected') &&
+                _returnMethod != null) ||
+            // Phase 1 replacement collection: not yet dropped at hub
+            (_display.returnType?.toLowerCase() == 'replacement' &&
+                !_replacementAllowed &&
+                _returnMethod != null));
 
     return Column(
       children: [
@@ -379,57 +397,26 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Status Hero ────────────────────────────────────────────
                 _buildStatusHero(ret),
                 SizedBox(height: 16.h),
-
-                // ── Progress Timeline ──────────────────────────────────────
                 _buildTimeline(ret),
                 SizedBox(height: 16.h),
-
-                // ── Customer Card ──────────────────────────────────────────
                 _buildCustomerCard(ret),
                 SizedBox(height: 12.h),
-
-                // ── Replacement Revive Card (shown only after admin approves) ─
-                // Conditions: replacement order, orderStatus == 'approved',
-                // isDropped, replacementDeliveryStatus is null or 'pending',
-                // and _replacementAllowed is still false.
-                if ((ret.returnType?.toLowerCase() == 'replacement' ||
-                        widget.returnOrder.returnType?.toLowerCase() ==
-                            'replacement') &&
-                    ret.orderStatus.toLowerCase() == 'approved' &&
-                    ret.isDropped &&
-                    (ret.replacementDeliveryStatus == null ||
-                        ret.replacementDeliveryStatus!.toLowerCase() ==
-                            'pending') &&
-                    !_replacementAllowed) ...[
-                  _buildWarehouseCard(ret),
-                  SizedBox(height: 12.h),
-                ],
-
-                // ── Return Info Card ───────────────────────────────────────
                 _buildReturnInfoCard(ret),
                 SizedBox(height: 12.h),
-
-                // ── Order Info Card ─────────────────────────────────────────
                 if (ret.order != null) _buildOrderInfoCard(ret),
                 if (ret.order != null) SizedBox(height: 12.h),
-                // ── Pick / Drop Selector (only when there's an action) ─────
                 if (_returnMethod != null) ...[
                   _buildMethodSelector(ret),
                   SizedBox(height: 12.h),
                 ],
-                // ── Amount Card ────────────────────────────────────────────
                 _buildAmountCard(ret),
                 SizedBox(height: 12.h),
               ],
             ),
           ),
         ),
-
-        // ── Sticky Bottom Confirm ──────────────────────────────────────────
-        // if (isRejectedDropped) _buildCompletedButton(),
         if (showConfirm) _buildStickyConfirm(),
       ],
     );
@@ -525,11 +512,10 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     List<_TimelineStep> steps;
 
     if (isReplacement && isRejected) {
-      // ── Replacement rejected by admin: 3-step (hub → customer → closed) ────
       steps = [
         _TimelineStep(
           icon: Icons.warehouse_outlined,
-          label: 'Received from Hub',
+          label: 'Picked from Hub',
           sublabel: 'Collect item',
           done: step >= 1,
           active: step == 0,
@@ -550,7 +536,6 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         ),
       ];
     } else if (isRejected) {
-      // ── Rejected: 2-step (hub → customer) ──────────────────────────────────
       steps = [
         _TimelineStep(
           icon: Icons.warehouse_outlined,
@@ -568,11 +553,11 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         ),
       ];
     } else if (isReplacement && ret.isDropped && _replacementAllowed) {
-      // ── Replacement delivery phase: 2-step (hub → customer) ───────────────
+      // ── Replacement delivery phase: 2-step (hub → customer)
       steps = [
         _TimelineStep(
           icon: Icons.warehouse_outlined,
-          label: 'Received from Hub',
+          label: 'Picked from Hub',
           sublabel: 'Item collected',
           done: step >= 1,
           active: step == 0,
@@ -586,7 +571,6 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         ),
       ];
     } else if (isReplacement && !ret.isDropped) {
-      // ── Replacement collection phase: 2-step (customer → hub) ─────────────
       steps = [
         _TimelineStep(
           icon: Icons.directions_walk_rounded,
@@ -604,7 +588,6 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         ),
       ];
     } else if (isReplacement && ret.isDropped && !_replacementAllowed) {
-      // ── Replacement awaiting admin approval: show completed 2-step collection
       steps = [
         _TimelineStep(
           icon: Icons.directions_walk_rounded,
@@ -622,7 +605,6 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         ),
       ];
     } else {
-      // ── Standard refund: 3-step ────────────────────────────────────────────
       steps = [
         _TimelineStep(
           icon: Icons.person_pin_circle_outlined,
@@ -803,122 +785,6 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     );
   }
 
-  // ── Warehouse Revive Card ──────────────────────────────────────────────────
-  Widget _buildWarehouseCard(ReturnOrder ret) {
-    return Container(
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F5F0),
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: const Color(0xFF8BC4AB)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40.w,
-            height: 40.w,
-            decoration: BoxDecoration(
-              color: const Color(0xFFC8E6D8),
-              borderRadius: BorderRadius.circular(10.r),
-            ),
-            child: Icon(Icons.swap_horiz_rounded, color: _green, size: 22.sp),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Item received at hub',
-                  style: TextStyle(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w700,
-                    color: _green,
-                  ),
-                ),
-                SizedBox(height: 2.h),
-                Text(
-                  'Tap receive to start delivery to customer.',
-                  style: TextStyle(
-                    fontSize: 11.sp,
-                    color: _green.withOpacity(0.75),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: 10.w),
-          GestureDetector(
-            onTap: _updatingStatus
-                ? null
-                : () async {
-                    try {
-                      setState(() => _updatingStatus = true);
-                      // Phase 2 Step A: rider picks item from hub
-                      // → replacementDeliveryStatus = 'received'
-                      final result = await ReturnRepo.updateReturnReplacementStatus(
-                        returnId: _display.id,
-                        replacementDeliveryStatus: 'received',
-                      );
-                      if (mounted && result['success'] == true) {
-                        setState(() {
-                          _replacementAllowed = true;
-                          _returnMethod = 'drop_off';
-                          _hasChanged = true;
-                        });
-                        AppSnackbar.showSuccess(
-                          title: 'Item Picked from Hub',
-                          message:
-                              'Now deliver the replacement to the customer.',
-                        );
-                        _fetchDetail();
-                      } else if (mounted) {
-                        AppSnackbar.showError(
-                          title: 'Update Failed',
-                          message: result['message'] ?? 'Could not update status.',
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        AppSnackbar.showError(
-                          title: 'Error',
-                          message: e.toString(),
-                        );
-                      }
-                    } finally {
-                      if (mounted) setState(() => _updatingStatus = false);
-                    }
-                  },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: _green,
-                borderRadius: BorderRadius.circular(8.r),
-              ),
-              child: _updatingStatus
-                  ? SizedBox(
-                      width: 14.w,
-                      height: 14.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(
-                      'Received',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13.sp,
-                      ),
-                    ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── Pick / Drop Selector ──────────────────────────────────────────────────
   Widget _buildMethodSelector(ReturnOrder ret) {
     final isReplacement = ret.returnType?.toLowerCase() == 'replacement';
@@ -937,8 +803,10 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     IconData droppedIcon;
 
     if (isReplacement && isRejected) {
-      // ── Replacement rejected by admin: pick from hub → return to customer ──
-      pickedLabel = 'Received from Hub';
+      final isRejectedReceived =
+          ret.orderStatus.toLowerCase() == 'rejected_received' ||
+          (ret.returnItemStatus?.toLowerCase() ?? '') == 'rejected_received';
+      pickedLabel = 'Picked from Hub';
       droppedLabel = 'Returned to Customer';
       pickedIcon = Icons.warehouse_outlined;
       droppedIcon = Icons.person_pin_circle_rounded;
@@ -949,24 +817,26 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       isPickedDone =
           normStatus == 'rejected_picked' || normStatus == 'rejected_dropped';
       isDroppedDone = normStatus == 'rejected_dropped';
-      canTapPicked = !isPickedDone;
-      canTapDropped = isPickedDone && !isDroppedDone;
+      canTapPicked = isRejectedReceived && !isPickedDone;
+      canTapDropped = isRejectedReceived && isPickedDone && !isDroppedDone;
     } else if (isReplacement) {
       if (_replacementAllowed) {
-        // Phase 2: hub → customer.
-        // replStatus='received' → picked from hub (step A done, step B pending)
-        // replStatus='completed'/'delivered' → delivered to customer (both steps done)
-        pickedLabel = 'Received from Hub';
+        // Phase 2: hub → customer
+        // 'received' = hub ready, rider NOT yet picked → show pickup button
+        // 'picked'   = rider confirmed pickup → show deliver button
+        pickedLabel = 'Picked from Hub';
         droppedLabel = 'Delivered to Customer';
         pickedIcon = Icons.warehouse_outlined;
         droppedIcon = Icons.person_pin_circle_rounded;
-        isPickedDone = replStatus == 'received' ||
+        isPickedDone =
+            _hubPickConfirmed || // local guard after first tap
+            replStatus == 'picked' ||
             replStatus == 'completed' ||
             replStatus == 'delivered';
-        isDroppedDone =
-            replStatus == 'completed' || replStatus == 'delivered';
-        canTapPicked = false; // warehouse card handles this step
-        canTapDropped = !isDroppedDone;
+        isDroppedDone = replStatus == 'completed' || replStatus == 'delivered';
+        canTapPicked =
+            replStatus == 'received' && !isPickedDone; // active when 'received'
+        canTapDropped = isPickedDone && !isDroppedDone;
       } else {
         // Phase 1: customer → hub
         pickedLabel = 'Picked from Customer';
@@ -987,23 +857,24 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         ' ',
         '_',
       );
+      final isRejectedReceived =
+          ret.orderStatus.toLowerCase() == 'rejected_received' ||
+          itemStatus == 'rejected_received';
       isPickedDone =
           itemStatus == 'rejected_picked' || itemStatus == 'rejected_dropped';
       isDroppedDone = itemStatus == 'rejected_dropped';
-      canTapPicked = !isPickedDone;
-      canTapDropped = isPickedDone && !isDroppedDone;
+      canTapPicked = isRejectedReceived && !isPickedDone;
+      canTapDropped = isRejectedReceived && isPickedDone && !isDroppedDone;
     } else {
       pickedLabel = 'Picked Up';
       droppedLabel = 'Dropped at Hub';
       pickedIcon = Icons.directions_walk_rounded;
       droppedIcon = Icons.local_shipping_outlined;
-      // Treat 'sent' status as dropped for action selector
       final itemStatus = (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(
         ' ',
         '_',
       );
       final effectivelyDropped = isDropped || itemStatus == 'sent';
-      // If effectively dropped, then picked must also be done
       isPickedDone = isPicked || effectivelyDropped;
       isDroppedDone = effectivelyDropped;
       canTapPicked = !isPickedDone;
@@ -1132,7 +1003,15 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
           _kv('${isReplacement ? 'Replacement' : 'Refund'} ID', ret.returnId),
           _dividerLine(),
           _kv('Reason', ret.reason ?? 'N/A'),
-          if (ret.returnItemStatus != null) ...[
+          // Hide returnItemStatus during replacement delivery phase 2
+          // to avoid confusing rider with phase 1 'dropped' status
+          if (ret.returnItemStatus != null &&
+              !(_replacementAllowed &&
+                  (ret.replacementDeliveryStatus?.toLowerCase() == 'picked' ||
+                      ret.replacementDeliveryStatus?.toLowerCase() ==
+                          'completed' ||
+                      ret.replacementDeliveryStatus?.toLowerCase() ==
+                          'delivered'))) ...[
             _dividerLine(),
             _kv(
               'Item Status',
@@ -1173,11 +1052,6 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
               statusText: ret.refundStatus!,
             ),
           ],
-          // _dividerLine(),
-          // _kv(
-          //   'Requested On',
-          //   ret.createdAt != null ? _formatDate(ret.createdAt!) : '—',
-          // ),
         ],
       ),
     );
@@ -1284,17 +1158,18 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     final isRejected = _display.orderStatus.toLowerCase().contains('rejected');
 
     if (isReplacement && isRejected) {
-      // Replacement rejected by admin: pick from hub → return to customer
       return _returnMethod == 'pickup'
-          ? 'Received from Hub'
+          ? 'Picked from Hub'
           : _returnMethod == 'drop_off'
           ? 'Returned to Customer'
           : 'Confirm';
     }
-    if (isReplacement) {
+
+    if (isReplacement && !isRejected) {
       if (_replacementAllowed) {
-        // Delivery phase: only drop_off remains (warehouse card handled 'sent')
-        return 'Delivered to Customer';
+        return _returnMethod == 'pickup'
+            ? 'Picked from Hub' // Step A: rider picks from hub
+            : 'Delivered to Customer'; // Step B: rider delivers to customer
       } else {
         return _returnMethod == 'pickup'
             ? 'Picked from Customer'
@@ -1303,69 +1178,13 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             : 'Confirm';
       }
     }
+
     return _returnMethod == 'pickup'
         ? 'Confirm Pickup'
         : _returnMethod == 'drop_off'
         ? 'Confirm Drop-off'
         : 'Confirm';
   }
-
-  // // ── Completed Button ─────────────────────────────────────────────────────────
-  // Widget _buildCompletedButton() {
-  //   final ret = _display;
-  //   final isReplacement = ret.returnType?.toLowerCase() == 'replacement';
-  //   final label = isReplacement ? 'Replacement Completed' : 'Refund Completed';
-
-  //   return Container(
-  //     padding: EdgeInsets.fromLTRB(
-  //       16.w,
-  //       12.h,
-  //       16.w,
-  //       16.h + MediaQuery.of(context).padding.bottom,
-  //     ),
-  //     decoration: BoxDecoration(
-  //       color: _surface,
-  //       boxShadow: [
-  //         BoxShadow(
-  //           color: Colors.black.withOpacity(0.07),
-  //           blurRadius: 16,
-  //           offset: const Offset(0, -4),
-  //         ),
-  //       ],
-  //     ),
-  //     child: SizedBox(
-  //       width: double.infinity,
-  //       height: 50.h,
-  //       child: ElevatedButton(
-  //         onPressed: null,
-  //         style: ElevatedButton.styleFrom(
-  //           backgroundColor: const Color(0xFF1E7E4C),
-  //           disabledBackgroundColor: const Color(0xFF1E7E4C),
-  //           foregroundColor: Colors.white,
-  //           elevation: 0,
-  //           shape: RoundedRectangleBorder(
-  //             borderRadius: BorderRadius.circular(12.r),
-  //           ),
-  //         ),
-  //         child: Row(
-  //           mainAxisAlignment: MainAxisAlignment.center,
-  //           children: [
-  //             Icon(Icons.check_circle_rounded, size: 18.sp),
-  //             SizedBox(width: 8.w),
-  //             Text(
-  //               label,
-  //               style: TextStyle(
-  //                 fontSize: 15.sp,
-  //                 fontWeight: FontWeight.w700,
-  //                 letterSpacing: -0.2,
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
 
   // ── Sticky Bottom Confirm ──────────────────────────────────────────────────
   Widget _buildStickyConfirm() {
@@ -1488,50 +1307,65 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
   }
 
   // ── Confirm Action ─────────────────────────────────────────────────────────
-  // Replacement delivery Phase 2 (hub → customer) uses updateReturnReplacementStatus
-  // so returnItemStatus is NEVER sent — backend enum can't go backwards.
-  //   Step A "Received from Hub"    → replacementDeliveryStatus='picked'
-  //   Step B "Delivered to Customer"→ replacementDeliveryStatus='delivered', orderStatus='completed'
-  // All other flows use updateReturnItemStatus.
   Future<void> _confirmAction() async {
     final method = _returnMethod;
     if (method == null) return;
     final isPickup = method == 'pickup';
     final isRejected = _display.orderStatus.toLowerCase().contains('rejected');
     final isReplacement = _display.returnType?.toLowerCase() == 'replacement';
-    // Phase 2 only when isDropped=true AND rider acknowledged receipt (_replacementAllowed)
     final isReplacementDeliveryPhase =
         isReplacement && _display.isDropped && _replacementAllowed;
 
     try {
       setState(() => _updatingStatus = true);
 
-      // ── Path A: Replacement delivery phase — use dedicated endpoint ──────────
+      // ── Path A: Replacement delivery phase ──────────────────────────────────
       if (isReplacementDeliveryPhase) {
-        // Only drop_off (deliver to customer) reaches here — this is the final step.
-        // replacementDeliveryStatus: pending → received (hub pickup) → completed (customer delivery)
-        final result = await ReturnRepo.updateReturnReplacementStatus(
+        final isPickupStep =
+            _returnMethod == 'pickup'; // rider picking from hub
+
+        final result = await ReturnRepo.updateReplacementPickupStatus(
           returnId: _display.id,
-          replacementDeliveryStatus: 'completed',
-          orderStatus: 'completed',
-          pickupStatus: 'item_delivered',
+          replacementPickupStatus: isPickupStep
+              ? 'replacement_pick' // Step A: rider picks from hub
+              : 'replacement_delivered', // Step B: rider delivers to customer
         );
 
         if (mounted && result['success'] == true) {
-          setState(() {
-            _hasChanged = true;
-            _detail = _display.copyWith(
-              replacementDeliveryStatus: 'completed',
-              orderStatus: 'completed',
+          if (isPickupStep) {
+            setState(() {
+              _hubPickConfirmed = true;
+              _returnMethod = 'drop_off'; // ✅ switches to delivery
+              _hasChanged = true;
+              _detailsConfirmed = false; // ✅ unchecks confirmation
+            });
+            // shows snackbar...
+            _fetchDetail(); // re-fetches from server
+          } else {
+            final walletCredited =
+                result['walletCredited'] ?? result['data']?['walletCredited'];
+            final walletBalance =
+                result['walletBalance'] ?? result['data']?['walletBalance'];
+            final creditMsg = walletCredited != null
+                ? ' ₹$walletCredited credited to wallet (Balance: ₹$walletBalance).'
+                : '';
+            setState(() {
+              _hasChanged = true;
+              _detailsConfirmed = false;
+              _detail = _display.copyWith(
+                replacementDeliveryStatus: 'delivered',
+                orderStatus: 'completed',
+                isDropped: true,
+                pickupStatus: 'item_delivered',
+              );
+            });
+            AppSnackbar.showSuccess(
+              title: 'Delivered!',
+              message:
+                  'Replacement delivered to customer. Order complete!$creditMsg',
             );
-          });
-          AppSnackbar.showSuccess(
-            title: 'Delivered!',
-            message: 'Replacement delivered to customer. Order complete!',
-          );
+          }
           _fetchDetail();
-          _hasChanged = true;
-          setState(() => _detailsConfirmed = false);
         } else if (mounted) {
           AppSnackbar.showError(
             title: 'Update Failed',
@@ -1797,8 +1631,9 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       case 'not_applicable':
       case 'rejected_picked':
       case 'rejected_dropped':
-      case 'rejected_received':
         return const Color(0xFFFFEBEB);
+      case 'rejected_received':
+        return const Color(0xFFFFF3E0);
       case 'shipped':
       case 'out_for_delivery':
       case 'item_picked':
@@ -1839,8 +1674,9 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       case 'not_applicable':
       case 'rejected_picked':
       case 'rejected_dropped':
-      case 'rejected_received':
         return _red;
+      case 'rejected_received':
+        return _orange;
       case 'shipped':
       case 'out_for_delivery':
       case 'item_picked':
