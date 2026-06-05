@@ -12,7 +12,6 @@ class WithdrawalSuccessScreen extends StatefulWidget {
   final num amount;
   const WithdrawalSuccessScreen({super.key, required this.amount});
 
-  @override
   State<WithdrawalSuccessScreen> createState() =>
       _WithdrawalSuccessScreenState();
 }
@@ -32,7 +31,6 @@ class _WithdrawalSuccessScreenState extends State<WithdrawalSuccessScreen>
   Future<RiderProfile>? _profileFuture;
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  @override
   void initState() {
     super.initState();
     _profileFuture = ProfileRepo.getProfile().then((json) {
@@ -98,7 +96,6 @@ class _WithdrawalSuccessScreenState extends State<WithdrawalSuccessScreen>
     await _cardController.forward();
   }
 
-  @override
   void dispose() {
     _iconController.dispose();
     _cardController.dispose();
@@ -106,7 +103,6 @@ class _WithdrawalSuccessScreenState extends State<WithdrawalSuccessScreen>
     super.dispose();
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121418), // Deep rich dark background
@@ -447,7 +443,6 @@ class _DashedDivider extends StatelessWidget {
 }
 
 class _DashedLinePainter extends CustomPainter {
-  @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = const Color(0xFFE0E0E0)

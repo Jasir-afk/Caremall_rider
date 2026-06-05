@@ -37,7 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Update local storage for fields that are present
         StorageService.saveUserName(profile.name);
         StorageService.saveUserAvatar(profile.avatar);
-        
+
         if (profile.address.isNotEmpty) {
           StorageService.saveUserAddress(profile.address);
         } else {
@@ -143,7 +143,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.error_outline, size: 48.sp, color: Colors.grey),
+                        Icon(
+                          Icons.error_outline,
+                          size: 48.sp,
+                          color: Colors.grey,
+                        ),
                         SizedBox(height: 12.h),
                         AppText(
                           text: 'Could not load profile',

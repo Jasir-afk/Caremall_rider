@@ -164,7 +164,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AppText(
-              text: 'Please provide a reason for marking this order as undelivered:',
+              text:
+                  'Please provide a reason for marking this order as undelivered:',
               fontSize: 14.sp,
             ),
             SizedBox(height: 12.h),
@@ -181,10 +182,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final reason = reasonController.text.trim();
@@ -196,7 +194,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 return;
               }
               Get.back();
-              
+
               setState(() => _updatingStatus = true);
               final result = await OrderRepo.updateOrderStatus(
                 orderId: widget.order.id,
@@ -242,7 +240,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           fontWeight: FontWeight.w700,
         ),
         content: AppText(
-          text: 'Are you sure you want to mark this order as dropped at warehouse?',
+          text:
+              'Are you sure you want to mark this order as dropped at warehouse?',
           fontSize: 14.sp,
         ),
         actions: [
@@ -269,9 +268,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     if (confirmed != true) return;
 
     setState(() => _updatingStatus = true);
-    final result = await OrderRepo.markWarehouseDrop(
-      orderId: widget.order.id,
-    );
+    final result = await OrderRepo.markWarehouseDrop(orderId: widget.order.id);
     if (mounted) setState(() => _updatingStatus = false);
 
     if (result['success'] == true) {
@@ -470,7 +467,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
+                Icon(
+                  Icons.wifi_off_rounded,
+                  size: 48.sp,
+                  color: Colors.grey[400],
+                ),
                 SizedBox(height: 12.h),
                 AppText(
                   text: 'Could not load order details',
@@ -746,7 +747,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ],
             ),
             SizedBox(height: 12.h),
-            if (_display.isInTransitStatus && !_display.orderStatus.toLowerCase().contains('undelivered')) ...[
+            if (_display.isInTransitStatus &&
+                !_display.orderStatus.toLowerCase().contains(
+                  'undelivered',
+                )) ...[
               Divider(color: Colors.grey[200]),
               SizedBox(height: 12.h),
               Row(
@@ -1033,8 +1037,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       );
     }
 
-    final isAlreadyUndelivered = _display.orderStatus.toLowerCase() == 'undelivered';
-    final isWarehouseDropPending = isAlreadyUndelivered && !_display.undeliveredWarehouseDrop;
+    final isAlreadyUndelivered =
+        _display.orderStatus.toLowerCase() == 'undelivered';
+    final isWarehouseDropPending =
+        isAlreadyUndelivered && !_display.undeliveredWarehouseDrop;
 
     // In Transit - Delivery Actions
     return Container(
@@ -1105,52 +1111,52 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                 ? null
                                 : _deliverOrder)
                           : _uploadPhoto),
-              btncolor: AppColors.primarycolor,
-              borderRadius: 8.r,
-              buttonStyle: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all(
-                  (_photoUploaded && _display.isCod && !_paymentCollected)
-                      ? Colors.grey
-                      : AppColors.primarycolor,
-                ),
-                shape: WidgetStateProperty.all(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.r),
+                btncolor: AppColors.primarycolor,
+                borderRadius: 8.r,
+                buttonStyle: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.all(
+                    (_photoUploaded && _display.isCod && !_paymentCollected)
+                        ? Colors.grey
+                        : AppColors.primarycolor,
+                  ),
+                  shape: WidgetStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
                   ),
                 ),
-              ),
-              child: (_uploading || _updatingStatus)
-                  ? SizedBox(
-                      width: 20.w,
-                      height: 20.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+                child: (_uploading || _updatingStatus)
+                    ? SizedBox(
+                        width: 20.w,
+                        height: 20.w,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _photoUploaded
+                                ? Icons.check_circle_outline
+                                : Icons.camera_alt_outlined,
+                            size: 16.sp,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 6.w),
+                          AppText(
+                            text: _photoUploaded
+                                ? 'Deliver Order'
+                                : 'Upload Photo',
+                            color: Colors.white,
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ],
                       ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _photoUploaded
-                              ? Icons.check_circle_outline
-                              : Icons.camera_alt_outlined,
-                          size: 16.sp,
-                          color: Colors.white,
-                        ),
-                        SizedBox(width: 6.w),
-                        AppText(
-                          text: _photoUploaded
-                              ? 'Deliver Order'
-                              : 'Upload Photo',
-                          color: Colors.white,
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ],
-                    ),
+              ),
             ),
-          ),
         ],
       ),
     );

@@ -10,6 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:math' show cos, sqrt, pi;
 import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
+import 'package:care_mall_rider/src/modules/return/controller/return_repo.dart';
+import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
 
 // ─────────────────────────────────────────────
 // Utils
@@ -38,6 +40,7 @@ class RouteStop {
   final int stopNumber;
   final double? lat;
   final double? lng;
+  final String type; // 'delivery' or 'return'
 
   const RouteStop({
     required this.orderId,
@@ -48,6 +51,7 @@ class RouteStop {
     required this.stopNumber,
     this.lat,
     this.lng,
+    this.type = 'delivery',
   });
 
   factory RouteStop.fromJson(Map<String, dynamic> json) {
@@ -90,6 +94,7 @@ class RouteStop {
       lng:
           safeNum(json['lng'])?.toDouble() ??
           safeNum(location['lng'])?.toDouble(),
+      type: json['type']?.toString() ?? 'delivery',
     );
   }
 }
@@ -247,6 +252,20 @@ Future<TodayRoute> fetchTodayRoute({
       // Sync with actual delivery orders to override stale backend statuses
       try {
         final actualOrders = await OrderRepo.getDeliveryOrders();
+        final returnOrders = await ReturnRepo.getReturnOrders();
+
+        // Fetch details for ALL return orders to get returnItemStatus
+        for (int i = 0; i < returnOrders.length; i++) {
+          try {
+            final r = returnOrders[i];
+            final detail = await ReturnRepo.getReturnDetail(r.id);
+            returnOrders[i] = detail;
+          } catch (e) {
+            debugPrint(
+              'Failed to fetch detail for return order at index $i: $e',
+            );
+          }
+        }
 
         List<RouteStop> syncedStops = [];
 
@@ -269,6 +288,7 @@ Future<TodayRoute> fetchTodayRoute({
                 stopNumber: stop.stopNumber,
                 lat: stop.lat,
                 lng: stop.lng,
+                type: stop.type,
               ),
             );
           } else {
@@ -296,8 +316,69 @@ Future<TodayRoute> fetchTodayRoute({
                   : '-',
               status: o.orderStatus,
               stopNumber: nextStopNum++,
+              type: 'delivery',
             ),
           );
+        }
+
+        // 3. Add active return orders to the route
+        final existingRouteReturnIds = <String>{};
+        for (final stop in syncedStops) {
+          if (stop.type == 'return') {
+            existingRouteReturnIds.add(stop.orderId);
+          }
+        }
+
+        final activeReturnOrders = returnOrders.where((r) {
+          final status = r.orderStatus.toLowerCase();
+          final itemStatus = (r.returnItemStatus?.toLowerCase() ?? '')
+              .replaceAll(' ', '_');
+          final replStatus = r.replacementDeliveryStatus?.toLowerCase();
+          final isReplacement = r.returnType?.toLowerCase() == 'replacement';
+
+          // History statuses - these should not be in active returns
+          const historyStatuses = {
+            'delivered',
+            'failed',
+            'cancelled',
+            'completed',
+            'refund_completed',
+            'returned',
+            'refunded',
+            'return_completed',
+          };
+
+          // Rejected but NOT yet dropped → still active
+          if (status == 'rejected' && itemStatus != 'rejected_dropped') {
+            return true;
+          }
+
+          if (itemStatus == 'rejected_dropped') return false;
+          if (historyStatuses.contains(status)) return false;
+
+          // Replacement completed when delivered to customer
+          if (isReplacement &&
+              (replStatus == 'completed' || replStatus == 'delivered')) {
+            return false;
+          }
+
+          return true;
+        }).toList();
+
+        for (final r in activeReturnOrders) {
+          if (!existingRouteReturnIds.contains(r.returnId)) {
+            syncedStops.add(
+              RouteStop(
+                orderId: r.returnId,
+                customerName: r.customerName ?? 'Unknown',
+                address: r.address ?? '-',
+                phone: r.customerPhone ?? '-',
+                status: r.orderStatus,
+                stopNumber: nextStopNum++,
+                type: 'return',
+              ),
+            );
+          }
         }
 
         final syncedRemaining = syncedStops.where((s) {
@@ -375,7 +456,11 @@ class _RouteScreenState extends State<RouteScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.error_outline, color: Colors.red, size: 48.sp),
+                          Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 48.sp,
+                          ),
                           SizedBox(height: 12.h),
                           AppText(
                             text: 'Could not load today\'s route.',
@@ -648,15 +733,18 @@ class _StopCard extends StatelessWidget {
             width: 36.w,
             height: 36.w,
             decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.1),
+              color: stop.type == 'return'
+                  ? Colors.orange.withValues(alpha: 0.1)
+                  : Colors.red.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10.r),
             ),
             alignment: Alignment.center,
-            child: AppText(
-              text: '${index + 1}',
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w700,
-              color: Colors.red,
+            child: Icon(
+              stop.type == 'return'
+                  ? Icons.assignment_return
+                  : Icons.location_on_outlined,
+              size: 18.sp,
+              color: stop.type == 'return' ? Colors.orange : Colors.red,
             ),
           ),
           SizedBox(width: 12.w),
@@ -669,11 +757,23 @@ class _StopCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    AppText(
-                      text: 'Order #${stop.orderId}',
-                      fontSize: 12.sp,
-                      color: Colors.grey[500]!,
-                      fontWeight: FontWeight.w500,
+                    Row(
+                      children: [
+                        AppText(
+                          text: stop.type == 'return' ? 'Return #' : 'Order #',
+                          fontSize: 12.sp,
+                          color: Colors.grey[500]!,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        AppText(
+                          text: stop.orderId,
+                          fontSize: 12.sp,
+                          color: stop.type == 'return'
+                              ? Colors.orange
+                              : Colors.grey[500]!,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ],
                     ),
                     Container(
                       padding: EdgeInsets.symmetric(

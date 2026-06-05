@@ -10,14 +10,12 @@ import 'package:intl/intl.dart';
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
 
-  @override
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
 class _WalletScreenState extends State<WalletScreen> {
   int _selectedTab = 0; // 0: Transactions, 1: Withdrawals
 
-  @override
   Widget build(BuildContext context) {
     final controller = Get.put(WalletController());
 
@@ -415,11 +413,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       color: statusColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      statusIcon,
-                      size: 18.sp,
-                      color: statusColor,
-                    ),
+                    child: Icon(statusIcon, size: 18.sp, color: statusColor),
                   ),
                   SizedBox(width: 12.w),
                   Column(
@@ -472,41 +466,37 @@ class _WalletScreenState extends State<WalletScreen> {
             ],
           ),
           // Admin note (shown when accepted/processed)
-          if (adminNote != null && adminNote.isNotEmpty) ...
-            [
-              SizedBox(height: 10.h),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  horizontal: 10.w,
-                  vertical: 8.h,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      size: 14.sp,
-                      color: statusColor,
-                    ),
-                    SizedBox(width: 6.w),
-                    Expanded(
-                      child: AppText(
-                        text: adminNote,
-                        fontSize: 12.sp,
-                        color: Colors.grey.shade700,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
+          if (adminNote != null && adminNote.isNotEmpty) ...[
+            SizedBox(height: 10.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(8.r),
               ),
-            ],
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 14.sp,
+                    color: statusColor,
+                  ),
+                  SizedBox(width: 6.w),
+                  Expanded(
+                    child: AppText(
+                      text: adminNote,
+                      fontSize: 12.sp,
+                      color: Colors.grey.shade700,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

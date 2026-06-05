@@ -90,7 +90,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  @override
   void dispose() {
     _deliveryScrollController.dispose();
     _historyScrollController.dispose();
@@ -924,6 +923,7 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : ListView.separated(
               controller: _deliveryScrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.all(16.w),
               itemCount: orders.length + (showLoadMore ? 1 : 0),
               separatorBuilder: (_, _) => SizedBox(height: 12.h),
@@ -1010,6 +1010,7 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : ListView.separated(
               controller: _historyScrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.all(16.w),
               itemCount: totalCount + (showLoadMore ? 1 : 0),
               separatorBuilder: (_, _) => SizedBox(height: 12.h),
@@ -1093,6 +1094,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onRefresh: _fetchOrders,
       child: ListView.separated(
         controller: _returnScrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.all(16.w),
         itemCount: activeReturns.length + (showLoadMore ? 1 : 0),
         separatorBuilder: (_, _) => SizedBox(height: 12.h),
@@ -1910,7 +1912,6 @@ class _AnimatedLoadMoreButton extends StatefulWidget {
     required this.onPressed,
   });
 
-  @override
   State<_AnimatedLoadMoreButton> createState() =>
       _AnimatedLoadMoreButtonState();
 }
@@ -1921,7 +1922,6 @@ class _AnimatedLoadMoreButtonState extends State<_AnimatedLoadMoreButton>
   late final Animation<double> _fade;
   late final Animation<Offset> _slide;
 
-  @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
@@ -1939,13 +1939,11 @@ class _AnimatedLoadMoreButtonState extends State<_AnimatedLoadMoreButton>
     });
   }
 
-  @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
   }
 
-  @override
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _fade,
