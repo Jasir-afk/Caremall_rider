@@ -10,16 +10,28 @@ class ProfileRepo {
   /// Fetch rider profile
   static Future<Map<String, dynamic>> getProfile() async {
     final token = await StorageService.getAuthToken();
+    Log.debug('[ProfileRepo] Fetching profile from: ${ApiUrls.getProfile}');
+    Log.debug('[ProfileRepo] Token exists: ${token != null}');
+
+    if (token == null) {
+      throw Exception('Authentication token not found. Please log in again.');
+    }
+
     final response = await http.get(
       Uri.parse(ApiUrls.getProfile),
       headers: {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $token',
       },
     );
 
+    Log.debug('[ProfileRepo] Response status: ${response.statusCode}');
+    Log.debug('[ProfileRepo] Response body: ${response.body}');
+
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
+    } else if (response.statusCode == 401) {
+      throw Exception('Session expired. Please log in again.');
     } else {
       throw Exception('Failed to load profile (${response.statusCode})');
     }

@@ -70,20 +70,17 @@ class AppTextFeild extends StatefulWidget {
   final TextCapitalization textCapitalization; // Added textCapitalization
   final List<TextInputFormatter>? inputFormatters; // Added inputFormatters
 
-  @override
   State<AppTextFeild> createState() => _AppTextFeildState();
 }
 
 class _AppTextFeildState extends State<AppTextFeild> {
   bool _obscureText = false;
 
-  @override
   void initState() {
     super.initState();
     _obscureText = widget.isobsecure ?? false;
   }
 
-  @override
   Widget build(BuildContext context) {
     ScreenUtil.init(context);
     return SizedBox(

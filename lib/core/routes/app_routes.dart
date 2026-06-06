@@ -1,6 +1,13 @@
 import 'package:get/get.dart';
+import 'package:care_mall_rider/app/bindings/auth_binding.dart';
+import 'package:care_mall_rider/app/bindings/home_binding.dart';
+import 'package:care_mall_rider/app/bindings/profile_binding.dart';
+import 'package:care_mall_rider/app/bindings/kyc_binding.dart';
 import 'package:care_mall_rider/src/modules/intilise_screen/view/splash_screen.dart';
-// Import other views as they are implemented
+import 'package:care_mall_rider/src/modules/auth/view/login_screen.dart';
+import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
+import 'package:care_mall_rider/src/modules/profile/view/profile_screen.dart';
+import 'package:care_mall_rider/src/modules/kyc/view/kyc_verification_screen.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -22,11 +29,31 @@ class AppPages {
 
   static final routes = [
     GetPage(name: AppRoutes.splash, page: () => const SplashScreen()),
-    // Add other pages here
+    GetPage(
+      name: AppRoutes.login,
+      page: () => LoginScreen(),
+      binding: AuthBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.home,
+      page: () => const HomeScreen(),
+      binding: HomeBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.profile,
+      page: () => const ProfileScreen(),
+      binding: ProfileBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.kyc,
+      page: () => const KycVerificationScreen(),
+      binding: KYCBinding(),
+    ),
     /*
     GetPage(
-      name: AppRoutes.otp,
-      page: () => const OtpVerificationScreen(),
+      name: AppRoutes.wallet,
+      page: () => const WalletScreen(),
+      binding: WalletBinding(),
     ),
     */
   ];

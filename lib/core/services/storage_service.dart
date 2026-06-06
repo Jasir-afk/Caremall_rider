@@ -126,6 +126,13 @@ class StorageService {
     return prefs.getString(_kycStatusKey) ?? 'pending';
   }
 
+  /// Check if KYC is approved (only approved riders can receive orders)
+  static Future<bool> isKycApproved() async {
+    final status = await getKycStatus();
+    final lowerStatus = status.toLowerCase();
+    return lowerStatus == 'approved' || lowerStatus == 'verified';
+  }
+
   /// Clear all authentication data
   static Future<bool> clearAuthData() async {
     final prefs = await _instance;

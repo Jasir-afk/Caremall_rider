@@ -1,13 +1,12 @@
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
+import 'package:care_mall_rider/core/routes/app_routes.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
-import 'package:care_mall_rider/src/modules/auth/view/login_screen.dart';
-import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
 import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
-import 'package:care_mall_rider/src/modules/kyc/view/kyc_verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -16,7 +15,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-
   void initState() {
     super.initState();
     _navigate();
@@ -24,36 +22,23 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _navigate() async {
     await Future.delayed(const Duration(seconds: 3));
-    if (!mounted) return;
     final isLoggedIn = await StorageService.isLoggedIn();
-    if (!mounted) return;
     if (!isLoggedIn) {
       // Not logged in → go to Login
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+      Get.offAllNamed(AppRoutes.login);
     } else {
       // Proactively fetch latest KYC status from API if logged in
       await KycRepo.getKycStatus();
       final kycDone = await StorageService.isKycCompleted();
-      if (!mounted) return;
       if (kycDone) {
         // Logged in + KYC done (verified or under_review) → go to Home
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        Get.offAllNamed(AppRoutes.home);
       } else {
         // Logged in but KYC pending or rejected → go to KYC
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const KycVerificationScreen()),
-        );
+        Get.offAllNamed(AppRoutes.kyc);
       }
     }
   }
-
 
   Widget build(BuildContext context) {
     return Scaffold(

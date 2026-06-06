@@ -11,7 +11,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 class BankDetailsScreen extends StatefulWidget {
   const BankDetailsScreen({super.key});
 
-  @override
   State<BankDetailsScreen> createState() => _BankDetailsScreenState();
 }
 
@@ -37,7 +36,6 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
 
   bool _isLoading = false;
 
-  @override
   void dispose() {
     _accountHolderController.dispose();
     _accountNumberController.dispose();
@@ -133,7 +131,6 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     return null;
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -439,7 +436,6 @@ class _FieldLabel extends StatelessWidget {
   final String text;
   const _FieldLabel({required this.text});
 
-  @override
   Widget build(BuildContext context) {
     return AppText(
       text: text,
@@ -462,7 +458,6 @@ class _ModeTab extends StatelessWidget {
     required this.onTap,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
@@ -506,7 +501,6 @@ class _StepProgressBar extends StatelessWidget {
 
   const _StepProgressBar({required this.currentStep, required this.totalSteps});
 
-  @override
   Widget build(BuildContext context) {
     List<Widget> children = [];
     for (int index = 0; index < totalSteps; index++) {
@@ -573,7 +567,6 @@ class _InputField extends StatelessWidget {
     this.suffixIcon,
   });
 
-  @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
@@ -624,7 +617,6 @@ class _InputField extends StatelessWidget {
 
 // ─── Upper Case Formatter ──────────────────────────────────────────────────────
 class _UpperCaseFormatter extends TextInputFormatter {
-  @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,

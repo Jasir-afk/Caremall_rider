@@ -196,18 +196,21 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       if (itemStatus.contains('rejected_dropped')) return 3;
       if (itemStatus.contains('rejected_picked')) return 1;
       if (orderStatus == 'rejected_received' ||
-          itemStatus == 'rejected_received')
+          itemStatus == 'rejected_received') {
         return 0;
+      }
       return -1;
     }
 
     if (isRejected) {
-      if (itemStatus == 'rejected_dropped' || itemStatus == 'item_delivered')
+      if (itemStatus == 'rejected_dropped' || itemStatus == 'item_delivered') {
         return 2;
+      }
       if (itemStatus == 'rejected_picked') return 1;
       if (orderStatus == 'rejected_received' ||
-          itemStatus == 'rejected_received')
+          itemStatus == 'rejected_received') {
         return 0;
+      }
       return -1;
     }
 

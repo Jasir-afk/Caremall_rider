@@ -17,9 +17,20 @@ class OrderRepo {
     String search = '',
     String status = '',
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
     final response = await http.get(
-      Uri.parse('${ApiUrls.deliveryOrders}?page=$page&limit=$limit&search=$search&status=$status'),
+      Uri.parse(
+        '${ApiUrls.deliveryOrders}?page=$page&limit=$limit&search=$search&status=$status',
+      ),
       headers: {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
@@ -41,6 +52,15 @@ class OrderRepo {
 
   /// Fetch dashboard statistics for the rider.
   static Future<Map<String, dynamic>> getDashboardStats() async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
     final response = await http.get(
       Uri.parse(ApiUrls.dashboard),
@@ -63,6 +83,15 @@ class OrderRepo {
 
   /// Fetch full dashboard with summary stats and today's orders.
   static Future<DashboardModel> getDashboard() async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http
@@ -86,11 +115,22 @@ class OrderRepo {
   }
 
   static Future<DashboardModel> getDeliveredTodayData() async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
     try {
       final response = await http
           .get(
-            Uri.parse('${ApiUrls.deliveryOrders}?page=1&limit=10&search=&status='),
+            Uri.parse(
+              '${ApiUrls.deliveryOrders}?page=1&limit=10&search=&status=',
+            ),
             headers: {
               'Content-Type': 'application/json',
               if (token != null) 'Authorization': 'Bearer $token',
@@ -119,6 +159,15 @@ class OrderRepo {
 
   /// Fetch a single order by its MongoDB document ID.
   static Future<DeliveryOrder> getOrderDetail(String orderId) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.get(
@@ -144,6 +193,15 @@ class OrderRepo {
     required String orderId,
     required File photo,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final request = http.MultipartRequest(
@@ -181,6 +239,15 @@ class OrderRepo {
 
   /// Fetch all return orders assigned to this rider.
   static Future<List<ReturnOrder>> getReturnOrders() async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.get(
@@ -248,6 +315,15 @@ class OrderRepo {
     bool? undeliveredWarehouseDrop,
     String? note,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.patch(
@@ -262,7 +338,8 @@ class OrderRepo {
         'status': status,
         if (reason != null) 'reason': reason,
         if (isUndelivered != null) 'isUndelivered': isUndelivered,
-        if (undeliveredWarehouseDrop != null) 'undeliveredWarehouseDrop': undeliveredWarehouseDrop,
+        if (undeliveredWarehouseDrop != null)
+          'undeliveredWarehouseDrop': undeliveredWarehouseDrop,
         if (note != null) 'note': note,
       }),
     );
@@ -283,6 +360,15 @@ class OrderRepo {
   static Future<Map<String, dynamic>> markWarehouseDrop({
     required String orderId,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.patch(
@@ -317,6 +403,15 @@ class OrderRepo {
     required String orderId,
     required String reason,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.post(
@@ -345,6 +440,15 @@ class OrderRepo {
   static Future<Map<String, dynamic>> sendDeliveryOTP({
     required String orderId,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     try {
@@ -382,6 +486,15 @@ class OrderRepo {
     required String orderId,
     required String otp,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     try {
@@ -415,6 +528,15 @@ class OrderRepo {
 
   /// Fetch a single return order by its ID.
   static Future<ReturnOrder> getReturnDetail(String returnId) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.get(
@@ -447,6 +569,15 @@ class OrderRepo {
     required String status,
     String? pickupStatus,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.patch(
@@ -482,6 +613,15 @@ class OrderRepo {
     bool? isPicked,
     bool? isDropped,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.patch(
@@ -497,7 +637,8 @@ class OrderRepo {
         if (pickStatus != null) 'pickStatus': pickStatus,
         if (pickupStatus != null) 'pickupStatus': pickupStatus,
         if (refundStatus != null) 'refundStatus': refundStatus,
-        if (replacementDeliveryStatus != null) 'replacementDeliveryStatus': replacementDeliveryStatus,
+        if (replacementDeliveryStatus != null)
+          'replacementDeliveryStatus': replacementDeliveryStatus,
         if (isPicked != null) 'isPicked': isPicked,
         if (isDropped != null) 'isDropped': isDropped,
       }),
@@ -519,6 +660,15 @@ class OrderRepo {
     required String returnId,
     required File photo,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
     final url = ApiUrls.returnUploadPhoto(returnId);
 
@@ -561,6 +711,15 @@ class OrderRepo {
     String? orderStatus, // pass 'completed' on final delivery step
     String? pickupStatus, // pass 'item_delivered' on final delivery step
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.patch(
@@ -597,6 +756,15 @@ class OrderRepo {
     required String returnId,
     required String replacementPickupStatus,
   }) async {
+    final isKycApproved = await StorageService.isKycApproved();
+    if (!isKycApproved) {
+      final kycStatus = await StorageService.getKycStatus();
+      throw Exception(
+        'KYC verification required. Your current KYC status is: ${kycStatus.toUpperCase()}. '
+        'Orders are only assigned to riders with approved KYC verification.',
+      );
+    }
+
     final token = await StorageService.getAuthToken();
 
     final response = await http.patch(
@@ -606,9 +774,7 @@ class OrderRepo {
         'Accept': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({
-        'replacementPickupStatus': replacementPickupStatus,
-      }),
+      body: jsonEncode({'replacementPickupStatus': replacementPickupStatus}),
     );
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -618,7 +784,58 @@ class OrderRepo {
     } else {
       return {
         'success': false,
-        'message': body['message'] ?? 'Failed to update replacement pickup status.',
+        'message':
+            body['message'] ?? 'Failed to update replacement pickup status.',
+      };
+    }
+  }
+
+  /// Calculate route distance
+  /// Accepts query parameters: lat, lng, stops (array of coordinates)
+  /// Returns distance in km and estimated time
+  static Future<Map<String, dynamic>> getRouteDistance({
+    required double lat,
+    required double lng,
+    List<Map<String, double>>? stops,
+  }) async {
+    final token = await StorageService.getAuthToken();
+
+    final queryParams = <String, String>{
+      'lat': lat.toString(),
+      'lng': lng.toString(),
+    };
+
+    if (stops != null && stops.isNotEmpty) {
+      queryParams['stops'] = jsonEncode(stops);
+    }
+
+    final uri = Uri.parse(
+      ApiUrls.routeDistance,
+    ).replace(queryParameters: queryParams);
+
+    final response = await http
+        .get(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return {
+        'success': true,
+        'data': body,
+        'distance': body['distance'],
+        'duration': body['duration'],
+      };
+    } else {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Failed to calculate route distance.',
       };
     }
   }

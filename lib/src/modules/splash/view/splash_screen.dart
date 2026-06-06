@@ -1,11 +1,10 @@
+import 'package:care_mall_rider/core/routes/app_routes.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
-import 'package:care_mall_rider/src/modules/auth/view/login_screen.dart';
-import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
 import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
-import 'package:care_mall_rider/src/modules/kyc/view/kyc_verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -14,7 +13,6 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-
   void initState() {
     super.initState();
     _navigate();
@@ -22,28 +20,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _navigate() async {
     await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
     final isLoggedIn = await StorageService.isLoggedIn();
-    if (!mounted) return;
     if (!isLoggedIn) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+      Get.offAllNamed(AppRoutes.login);
     } else {
       await KycRepo.getKycStatus();
       final kycDone = await StorageService.isKycCompleted();
-      if (!mounted) return;
       if (kycDone) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        Get.offAllNamed(AppRoutes.home);
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const KycVerificationScreen()),
-        );
+        Get.offAllNamed(AppRoutes.kyc);
       }
     }
   }

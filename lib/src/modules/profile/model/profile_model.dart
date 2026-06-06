@@ -40,17 +40,19 @@ class RiderProfile {
   });
 
   factory RiderProfile.fromJson(Map<String, dynamic> json) {
-    final kyc = json['kyc'] as Map<String, dynamic>? ?? {};
-    final vehicle = json['vehicleDetails'] as Map<String, dynamic>? ?? {};
-    final bank = json['bankDetails'] as Map<String, dynamic>? ?? {};
+    // Data is nested under 'deliveryBoy' key
+    final data = json['deliveryBoy'] as Map<String, dynamic>? ?? json;
+    final kyc = data['kyc'] as Map<String, dynamic>? ?? {};
+    final vehicle = data['vehicleDetails'] as Map<String, dynamic>? ?? {};
+    final bank = data['bankDetails'] as Map<String, dynamic>? ?? {};
     return RiderProfile(
-      id: json['_id']?.toString() ?? '',
-      name: json['name']?.toString() ?? 'Rider',
-      phone: json['phone']?.toString() ?? '',
-      email: json['email']?.toString() ?? '',
-      address: json['address']?.toString() ?? '',
-      avatar: json['avatar']?.toString() ?? '',
-      status: json['status']?.toString() ?? 'active',
+      id: data['_id']?.toString() ?? '',
+      name: data['name']?.toString() ?? 'Rider',
+      phone: data['phone']?.toString() ?? '',
+      email: data['email']?.toString() ?? '',
+      address: data['address']?.toString() ?? '',
+      avatar: data['avatar']?.toString() ?? '',
+      status: data['status']?.toString() ?? 'active',
       kycStatus: kyc['status']?.toString() ?? '-',
       vehicleType: vehicle['vehicleType']?.toString() ?? '-',
       registrationNumber: vehicle['registrationNumber']?.toString() ?? '',

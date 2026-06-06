@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:care_mall_rider/app/utils/network/logger_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
+
 class AuthService {
-  
   /// Sends OTP to the provided phone number
   ///
   /// Parameters:
@@ -47,12 +47,18 @@ class AuthService {
         };
       }
     } catch (e) {
-      if (e is http.ClientException || e.toString().contains('SocketException')) {
-        return {'success': false, 'message': 'Failed to connect to server. Please check your internet connection or server status.'};
+      if (e is http.ClientException ||
+          e.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'message':
+              'Failed to connect to server. Please check your internet connection or server status.',
+        };
       }
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
   }
+
   /// Verifies the OTP entered by the user
   ///
   /// Parameters:
@@ -99,13 +105,19 @@ class AuthService {
       } else {
         return {
           'success': false,
-          'message':responseData['message'] ?? 'Invalid OTP. Please try again.',
+          'message':
+              responseData['message'] ?? 'Invalid OTP. Please try again.',
           'data': responseData,
         };
       }
     } catch (e) {
-      if (e is http.ClientException || e.toString().contains('SocketException')) {
-        return {'success': false, 'message': 'Failed to connect to server. Please check your internet connection or server status.'};
+      if (e is http.ClientException ||
+          e.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'message':
+              'Failed to connect to server. Please check your internet connection or server status.',
+        };
       }
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }

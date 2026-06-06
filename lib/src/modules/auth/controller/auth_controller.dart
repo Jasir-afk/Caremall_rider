@@ -19,7 +19,6 @@ class AuthController extends GetxController {
   final userAvatar = ''.obs;
   final authToken = ''.obs;
 
-  @override
   void onInit() {
     super.onInit();
     // Restore authentication state from persistent storage on startup

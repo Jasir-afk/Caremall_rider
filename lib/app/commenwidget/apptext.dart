@@ -27,7 +27,6 @@ class AppText extends StatelessWidget {
     this.maxLines,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Text(
       text,
