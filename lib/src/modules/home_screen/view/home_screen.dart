@@ -56,6 +56,31 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _returnScrollController = ScrollController();
   // Scroll state
   bool _hasScrolledBeyondFirstPage = false;
+  // Search state
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  // Filter orders based on search query
+  List<DeliveryOrder> _filterDeliveryOrders(List<DeliveryOrder> orders) {
+    if (_searchQuery.isEmpty) return orders;
+    final query = _searchQuery.toLowerCase();
+    return orders.where((order) {
+      return order.orderId.toLowerCase().contains(query) ||
+          order.shippingAddress.fullName.toLowerCase().contains(query) ||
+          order.shippingAddress.phone.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  // Filter return orders based on search query
+  List<ReturnOrder> _filterReturnOrders(List<ReturnOrder> orders) {
+    if (_searchQuery.isEmpty) return orders;
+    final query = _searchQuery.toLowerCase();
+    return orders.where((order) {
+      return order.returnId.toLowerCase().contains(query) ||
+          (order.customerName?.toLowerCase().contains(query) ?? false) ||
+          (order.customerPhone?.toLowerCase().contains(query) ?? false);
+    }).toList();
+  }
 
   void initState() {
     super.initState();
@@ -94,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _deliveryScrollController.dispose();
     _historyScrollController.dispose();
     _returnScrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -302,6 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
   };
   static const _transitStatuses = {
     'shipped',
+    'shipping',
     'out_for_delivery',
     'picked_up',
     'undelivered',
@@ -324,7 +351,11 @@ class _HomeScreenState extends State<HomeScreen> {
       .where((o) => _newStatuses.contains(o.orderStatus.toLowerCase()))
       .toList();
   List<DeliveryOrder> get _inTransitOrders => _baseOrders
-      .where((o) => _transitStatuses.contains(o.orderStatus.toLowerCase()))
+      .where(
+        (o) =>
+            _transitStatuses.contains(o.orderStatus.toLowerCase()) &&
+            !o.undeliveredWarehouseDrop,
+      )
       .toList();
   List<DeliveryOrder> get _historyOrders => _baseOrders
       .where((o) => _historyStatuses.contains(o.orderStatus.toLowerCase()))
@@ -550,6 +581,53 @@ class _HomeScreenState extends State<HomeScreen> {
                             3,
                           ),
                         ],
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+
+                    // ─── Search Bar ──────────────────────────────────────────────────
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (value) {
+                            setState(() => _searchQuery = value);
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Search by customer phone',
+                            hintStyle: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 14.sp,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: Colors.grey[400],
+                            ),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(
+                                      Icons.clear,
+                                      color: Colors.grey[400],
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                  )
+                                : null,
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 12.h,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     SizedBox(height: 16.h),
@@ -833,7 +911,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       : Colors.grey[600]!,
                   maxLines: 1,
                 ),
-                if (count >= 0)
+                if (count > 0)
                   Positioned(
                     top: -10.h,
                     right: -14.w,
@@ -899,7 +977,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    final allOrders = _currentOrders;
+    final allOrders = _filterDeliveryOrders(_currentOrders);
     final orders = allOrders.take(_visibleNewCount).toList();
     final bool showLoadMore =
         orders.length < allOrders.length ||
@@ -983,8 +1061,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    final allDel = _historyOrders;
-    final allRet = _historyReturnOrders;
+    final allDel = _filterDeliveryOrders(_historyOrders);
+    final allRet = _filterReturnOrders(_historyReturnOrders);
     final allCombined = [...allRet, ...allDel];
     final totalAll = allCombined.length;
     final combinedOrders = allCombined.take(_visibleHistoryCount).toList();
@@ -1075,7 +1153,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    final allReturns = _activeReturnOrders;
+    final allReturns = _filterReturnOrders(_activeReturnOrders);
     if (allReturns.isEmpty) {
       return Center(
         child: AppText(
@@ -1294,6 +1372,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           '_',
                         );
 
+                    final bool isDropped = ret.isDropped;
                     final bool isCompleted =
                         // Rejected orders: only complete when rider has returned item to customer
                         (isRejected && itemStatusClean == 'rejected_dropped') ||
@@ -1302,10 +1381,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             _historyStatuses.contains(
                               ret.orderStatus.toLowerCase(),
                             )) ||
-                        // Normal refund dropped at hub = completed
-                        (!isRejected &&
-                            ret.returnType?.toLowerCase() != 'replacement' &&
-                            ret.isDropped) ||
                         // Replacement: completed when replacementDeliveryStatus is 'completed' or 'delivered'
                         // Note: 'received' now means picker picked from hub (intermediate step)
                         (ret.returnType?.toLowerCase() == 'replacement' &&
@@ -1313,6 +1388,50 @@ class _HomeScreenState extends State<HomeScreen> {
                                     'completed' ||
                                 ret.replacementDeliveryStatus?.toLowerCase() ==
                                     'delivered'));
+
+                    // Show "Dropped" state when item is dropped at hub but not yet completed
+                    final bool showDropped = isDropped && !isCompleted;
+
+                    if (showDropped) {
+                      return GestureDetector(
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ReturnDetailsScreen(returnOrder: ret),
+                            ),
+                          );
+                          if (result == true && mounted) {
+                            _fetchOrders();
+                          }
+                        },
+                        child: Container(
+                          height: 36.h,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6F4EE),
+                            borderRadius: BorderRadius.circular(6.r),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                color: const Color(0xFF1E7E4C),
+                                size: 14.sp,
+                              ),
+                              SizedBox(width: 4.w),
+                              AppText(
+                                text: 'Dropped',
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E7E4C),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
 
                     if (isCompleted) {
                       final bool showAsRejectedDropped =
@@ -1769,8 +1888,17 @@ class _HomeScreenState extends State<HomeScreen> {
     if (index == 0) {
       badgeCount = _newOrders.length;
     } else if (index == 1) {
-      // Route screen shows all active delivery orders (New + In Transit)
-      badgeCount = _newOrders.length + _inTransitOrders.length;
+      // Route badge shows total active orders (New + In Transit excluding undelivered) + active return orders
+      // Deduplicate orders that might appear in both New and In Transit
+      final allActiveOrders = [..._newOrders, ..._inTransitOrders];
+      final uniqueOrderIds = <String>{};
+      final uniqueActiveOrders = allActiveOrders.where((o) {
+        if (o.orderStatus.toLowerCase() == 'undelivered') return false;
+        if (uniqueOrderIds.contains(o.orderId)) return false;
+        uniqueOrderIds.add(o.orderId);
+        return true;
+      }).toList();
+      badgeCount = uniqueActiveOrders.length + _activeReturnOrders.length;
     }
 
     return GestureDetector(

@@ -432,7 +432,6 @@ class _WithdrawalSuccessScreenState extends State<WithdrawalSuccessScreen>
 class _DashedDivider extends StatelessWidget {
   const _DashedDivider();
 
-  @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 1.h,
@@ -459,7 +458,6 @@ class _DashedLinePainter extends CustomPainter {
     }
   }
 
-  @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
@@ -467,7 +465,6 @@ class _PremiumCheckPainter extends CustomPainter {
   final double progress;
   _PremiumCheckPainter(this.progress);
 
-  @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = Colors.white
@@ -490,6 +487,5 @@ class _PremiumCheckPainter extends CustomPainter {
     canvas.drawPath(extractPath, paint);
   }
 
-  @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

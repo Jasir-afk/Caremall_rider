@@ -1342,13 +1342,13 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             // shows snackbar...
             _fetchDetail(); // re-fetches from server
           } else {
-            final walletCredited =
-                result['walletCredited'] ?? result['data']?['walletCredited'];
-            final walletBalance =
-                result['walletBalance'] ?? result['data']?['walletBalance'];
-            final creditMsg = walletCredited != null
-                ? ' ₹$walletCredited credited to wallet (Balance: ₹$walletBalance).'
-                : '';
+            // final walletCredited =
+            //     result['walletCredited'] ?? result['data']?['walletCredited'];
+            // final walletBalance =
+            //     result['walletBalance'] ?? result['data']?['walletBalance'];
+            // final creditMsg = walletCredited != null
+            //     ? ' ₹$walletCredited credited to wallet (Balance: ₹$walletBalance).'
+            //     : '';
             setState(() {
               _hasChanged = true;
               _detailsConfirmed = false;
@@ -1361,8 +1361,8 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             });
             AppSnackbar.showSuccess(
               title: 'Delivered!',
-              message:
-                  'Replacement delivered to customer. Order complete!$creditMsg',
+              message: 'Replacement delivered to customer. Order complete!',
+              // $creditMsg',
             );
           }
           _fetchDetail();

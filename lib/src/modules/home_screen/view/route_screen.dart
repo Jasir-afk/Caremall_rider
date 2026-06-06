@@ -10,8 +10,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:math' show cos, sqrt, pi;
 import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
+import 'package:care_mall_rider/src/modules/home_screen/view/order_details_screen.dart';
 import 'package:care_mall_rider/src/modules/return/controller/return_repo.dart';
-import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
+import 'package:care_mall_rider/src/modules/return/view/return_details_screen.dart';
 
 // ─────────────────────────────────────────────
 // Utils
@@ -269,7 +270,7 @@ Future<TodayRoute> fetchTodayRoute({
 
         List<RouteStop> syncedStops = [];
 
-        // 1. Sync existing backend stops with fresh data
+        // 1. Sync existing backend stops with fresh data (excluding undelivered)
         final existingRouteOrderIds = <String>{};
         for (final stop in baseRoute.stops) {
           final realOrder = actualOrders
@@ -277,6 +278,10 @@ Future<TodayRoute> fetchTodayRoute({
               .firstOrNull;
 
           if (realOrder != null) {
+            // Skip undelivered orders
+            if (realOrder.orderStatus.toLowerCase() == 'undelivered') {
+              continue;
+            }
             existingRouteOrderIds.add(stop.orderId);
             syncedStops.add(
               RouteStop(
@@ -292,14 +297,19 @@ Future<TodayRoute> fetchTodayRoute({
               ),
             );
           } else {
-            // Keep anyway if not found in current refresh
+            // Keep anyway if not found in current refresh, but skip undelivered
+            if (stop.status.toLowerCase() == 'undelivered') {
+              continue;
+            }
             syncedStops.add(stop);
           }
         }
 
-        // 2. Append missing "New" and "In Transit" orders
+        // 2. Append missing "New" and "In Transit" orders (excluding undelivered)
         final missingActiveOrders = actualOrders.where((o) {
-          return o.isActive && !existingRouteOrderIds.contains(o.orderId);
+          return o.isActive &&
+              o.orderStatus.toLowerCase() != 'undelivered' &&
+              !existingRouteOrderIds.contains(o.orderId);
         }).toList();
 
         int nextStopNum = syncedStops.length + 1;
@@ -711,131 +721,174 @@ class _StopCard extends StatelessWidget {
   }
 
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(14.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14.r),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Stop number badge
-          Container(
-            width: 36.w,
-            height: 36.w,
-            decoration: BoxDecoration(
-              color: stop.type == 'return'
-                  ? Colors.orange.withValues(alpha: 0.1)
-                  : Colors.red.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10.r),
+    return GestureDetector(
+      onTap: () async {
+        if (stop.type == 'return') {
+          try {
+            final returnOrders = await ReturnRepo.getReturnOrders();
+            final returnOrder = returnOrders.firstWhere(
+              (r) => r.returnId == stop.orderId,
+              orElse: () => throw Exception('Return order not found'),
+            );
+            if (context.mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ReturnDetailsScreen(returnOrder: returnOrder),
+                ),
+              );
+            }
+          } catch (e) {
+            debugPrint('Error fetching return order: $e');
+          }
+        } else {
+          try {
+            final orders = await OrderRepo.getDeliveryOrders();
+            final order = orders.firstWhere(
+              (o) => o.orderId == stop.orderId,
+              orElse: () => throw Exception('Order not found'),
+            );
+            if (context.mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OrderDetailsScreen(order: order),
+                ),
+              );
+            }
+          } catch (e) {
+            debugPrint('Error fetching order: $e');
+          }
+        }
+      },
+      child: Container(
+        padding: EdgeInsets.all(14.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(color: Colors.grey[200]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            alignment: Alignment.center,
-            child: Icon(
-              stop.type == 'return'
-                  ? Icons.assignment_return
-                  : Icons.location_on_outlined,
-              size: 18.sp,
-              color: stop.type == 'return' ? Colors.orange : Colors.red,
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Stop number badge
+            Container(
+              width: 36.w,
+              height: 36.w,
+              decoration: BoxDecoration(
+                color: stop.type == 'return'
+                    ? Colors.orange.withValues(alpha: 0.1)
+                    : Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                stop.type == 'return'
+                    ? Icons.assignment_return
+                    : Icons.location_on_outlined,
+                size: 18.sp,
+                color: stop.type == 'return' ? Colors.orange : Colors.red,
+              ),
             ),
-          ),
-          SizedBox(width: 12.w),
+            SizedBox(width: 12.w),
 
-          // Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        AppText(
-                          text: stop.type == 'return' ? 'Return #' : 'Order #',
-                          fontSize: 12.sp,
-                          color: Colors.grey[500]!,
-                          fontWeight: FontWeight.w500,
+            // Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          AppText(
+                            text: stop.type == 'return'
+                                ? 'Return #'
+                                : 'Order #',
+                            fontSize: 12.sp,
+                            color: Colors.grey[500]!,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          AppText(
+                            text: stop.orderId,
+                            fontSize: 12.sp,
+                            color: stop.type == 'return'
+                                ? Colors.orange
+                                : Colors.grey[500]!,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8.w,
+                          vertical: 4.h,
                         ),
-                        AppText(
-                          text: stop.orderId,
-                          fontSize: 12.sp,
-                          color: stop.type == 'return'
-                              ? Colors.orange
-                              : Colors.grey[500]!,
+                        decoration: BoxDecoration(
+                          color: _statusBadgeBg(stop.status),
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                        child: AppText(
+                          text: stop.status.replaceAll('_', ' ').toUpperCase(),
+                          fontSize: 11.sp,
                           fontWeight: FontWeight.w600,
+                          color: _statusBadgeFg(stop.status),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4.h),
+                  RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.dmSans(
+                        fontSize: 14.sp,
+                        color: AppColors.textnaturalcolor,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: stop.customerName,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8.w,
-                        vertical: 4.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _statusBadgeBg(stop.status),
-                        borderRadius: BorderRadius.circular(4.r),
-                      ),
-                      child: AppText(
-                        text: stop.status.replaceAll('_', ' ').toUpperCase(),
-                        fontSize: 11.sp,
-                        fontWeight: FontWeight.w600,
-                        color: _statusBadgeFg(stop.status),
-                      ),
+                  ),
+                  SizedBox(height: 2.h),
+                  AppText(
+                    text: stop.address,
+                    fontSize: 12.sp,
+                    color: Colors.grey[600]!,
+                  ),
+                  if (stop.phone != '-') ...[
+                    SizedBox(height: 8.h),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.phone_outlined,
+                          size: 13.sp,
+                          color: Colors.grey[500],
+                        ),
+                        SizedBox(width: 4.w),
+                        AppText(
+                          text: stop.phone,
+                          fontSize: 12.sp,
+                          color: Colors.grey[500]!,
+                        ),
+                      ],
                     ),
                   ],
-                ),
-                SizedBox(height: 4.h),
-                RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.dmSans(
-                      fontSize: 14.sp,
-                      color: AppColors.textnaturalcolor,
-                    ),
-                    children: [
-                      TextSpan(
-                        text: stop.customerName,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 2.h),
-                AppText(
-                  text: stop.address,
-                  fontSize: 12.sp,
-                  color: Colors.grey[600]!,
-                ),
-                if (stop.phone != '-') ...[
-                  SizedBox(height: 8.h),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.phone_outlined,
-                        size: 13.sp,
-                        color: Colors.grey[500],
-                      ),
-                      SizedBox(width: 4.w),
-                      AppText(
-                        text: stop.phone,
-                        fontSize: 12.sp,
-                        color: Colors.grey[500]!,
-                      ),
-                    ],
-                  ),
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

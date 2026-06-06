@@ -82,6 +82,7 @@ class DeliveryOrder {
   bool get isInTransitStatus {
     const transitStatuses = {
       'shipped',
+      'shipping',
       'out_for_delivery',
       'in_transit',
       'in-transit',

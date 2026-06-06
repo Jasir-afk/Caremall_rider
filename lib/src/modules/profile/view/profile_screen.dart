@@ -14,14 +14,12 @@ import 'package:get/get.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
-  @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
   Future<RiderProfile>? _profileFuture;
 
-  @override
   void initState() {
     super.initState();
     _loadProfile();
@@ -121,7 +119,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 250, 250, 255),
@@ -312,7 +309,6 @@ class _HeroHeader extends StatelessWidget {
 
   const _HeroHeader({required this.profile, required this.onEdit});
 
-  @override
   Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
@@ -432,7 +428,6 @@ class _Chip extends StatelessWidget {
 
   const _Chip({required this.label, required this.color, this.textColor});
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
@@ -470,7 +465,6 @@ class _InfoCard extends StatelessWidget {
     required this.rows,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -574,7 +568,6 @@ class _MiniCard extends StatelessWidget {
     required this.lines,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(14.w),
@@ -636,7 +629,6 @@ class _StatusBanner extends StatelessWidget {
 
   const _StatusBanner({required this.kycStatus});
 
-  @override
   Widget build(BuildContext context) {
     final (color, bg, icon, label) = switch (kycStatus.toLowerCase()) {
       'approved' => (
@@ -751,7 +743,6 @@ class _LogoutButton extends StatelessWidget {
 
   const _LogoutButton({required this.onTap});
 
-  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,

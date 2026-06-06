@@ -16,7 +16,6 @@ class EditProfileScreen extends StatefulWidget {
   final RiderProfile profile;
   const EditProfileScreen({super.key, required this.profile});
 
-  @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
@@ -52,7 +51,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'Truck',
   ];
 
-  @override
   void initState() {
     super.initState();
     final p = widget.profile;
@@ -72,7 +70,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _regCtrl = TextEditingController(text: p.registrationNumber);
   }
 
-  @override
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
@@ -233,7 +230,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         // Save new avatar URL if available in response
         final data = result['data'];
         if (data != null) {
-          final user = data['deliveryBoy'] ?? data['rider'] ?? data['user'] ?? data['data'];
+          final user =
+              data['deliveryBoy'] ??
+              data['rider'] ??
+              data['user'] ??
+              data['data'];
           if (user != null && user['avatar'] != null) {
             await StorageService.saveUserAvatar(user['avatar'].toString());
           }
@@ -260,7 +261,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
@@ -647,8 +647,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // ── Vehicle Section ───────────────────────────────────────────────────────
-
   Widget _buildVehicleSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -776,7 +774,6 @@ class _SectionCard extends StatelessWidget {
     required this.child,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
@@ -845,7 +842,6 @@ class _EditField extends StatelessWidget {
     this.hint,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -930,7 +926,6 @@ class _ModeTab extends StatelessWidget {
     required this.onTap,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
@@ -970,7 +965,6 @@ class _ModeTab extends StatelessWidget {
 // ─── Upper Case Formatter ─────────────────────────────────────────────────────
 
 class _UpperCaseFormatter extends TextInputFormatter {
-  @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
