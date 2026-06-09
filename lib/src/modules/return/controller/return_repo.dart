@@ -4,8 +4,18 @@ import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.da
 import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
 
 class ReturnRepo {
-  static Future<List<ReturnOrder>> getReturnOrders() {
-    return OrderRepo.getReturnOrders();
+  static Future<List<ReturnOrder>> getReturnOrders({
+    int page = 1,
+    int limit = 50,
+    String search = '',
+    String status = '',
+  }) {
+    return OrderRepo.getReturnOrders(
+      page: page,
+      limit: limit,
+      search: search,
+      status: status,
+    );
   }
 
   static Future<ReturnOrder> getReturnDetail(String returnId) {
@@ -72,12 +82,12 @@ class ReturnRepo {
   /// PATCH /api/v1/rider/returns/:id/replacement-pickup-status
   /// replacementPickupStatus: 'replacement_pick' | 'replacement_delivered'
   static Future<Map<String, dynamic>> updateReplacementPickupStatus({
-  required String returnId,
-  required String replacementPickupStatus,
-}){
-  return OrderRepo.updateReplacementPickupStatus(
-    returnId: returnId,
-    replacementPickupStatus: replacementPickupStatus,
-  );
-}
+    required String returnId,
+    required String replacementPickupStatus,
+  }) {
+    return OrderRepo.updateReplacementPickupStatus(
+      returnId: returnId,
+      replacementPickupStatus: replacementPickupStatus,
+    );
+  }
 }

@@ -160,11 +160,16 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       final isRejectedReceived =
           ret.orderStatus.toLowerCase() == 'rejected_received' ||
           itemStatus == 'rejected_received';
+      // For warehouse-rejected refunds: if item is dropped at warehouse, rider should pick up
+      // and deliver back to customer
       if (itemStatus == 'rejected_dropped') {
-        _returnMethod = null;
+        _returnMethod = null; // Already delivered back to customer
       } else if (itemStatus == 'rejected_picked') {
-        _returnMethod = 'drop_off';
-      } else if (isRejectedReceived) {
+        _returnMethod =
+            'drop_off'; // Picked from warehouse, deliver to customer
+      } else if (isRejectedReceived ||
+          (itemStatus == 'dropped' && ret.isFromWarehouse)) {
+        // Enable pickup when rejected_received OR when dropped at warehouse (warehouse workflow)
         _returnMethod = 'pickup';
       } else {
         _returnMethod = null;
@@ -209,6 +214,10 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         return 2;
       }
       if (itemStatus == 'rejected_picked') return 1;
+      // For warehouse-rejected refunds: if item is dropped at warehouse, show step 0 (pickup)
+      if (itemStatus == 'dropped' && ret.isFromWarehouse) {
+        return 0;
+      }
       if (orderStatus == 'rejected_received' ||
           itemStatus == 'rejected_received') {
         return 0;
@@ -368,6 +377,19 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         _display.isDropped &&
         _replacementAllowed;
 
+    // Debug logging for warehouse-rejected refunds
+    if (_display.orderStatus.toLowerCase().contains('rejected')) {
+      debugPrint('=== REJECTED REFUND DEBUG ===');
+      debugPrint('orderStatus: ${_display.orderStatus}');
+      debugPrint('isFromWarehouse: ${_display.isFromWarehouse}');
+      debugPrint('returnItemStatus: ${_display.returnItemStatus}');
+      debugPrint('isDropped: ${_display.isDropped}');
+      debugPrint('_returnMethod: $_returnMethod');
+      debugPrint('isReplacementPhase2: $isReplacementPhase2');
+      debugPrint('replStatus: $replStatus');
+      debugPrint('============================');
+    }
+
     final bool showConfirm =
         !(_display.orderStatus.toLowerCase() == 'cancelled' ||
             _display.orderStatus.toLowerCase() == 'failed' ||
@@ -382,10 +404,13 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
                 (replStatus == 'received' ||
                     replStatus == 'picked' ||
                     _sourcePickConfirmed)) ||
-            // Standard refund: not yet dropped
+            // Standard refund: not yet dropped (including rejected refunds for warehouse workflow)
             (!_display.isDropped &&
-                _display.returnType?.toLowerCase() != 'replacement' &&
-                !_display.orderStatus.toLowerCase().contains('rejected')) ||
+                _display.returnType?.toLowerCase() != 'replacement') ||
+            // Warehouse-rejected refund: item dropped at warehouse, rider needs to pick up
+            (_display.orderStatus.toLowerCase().contains('rejected') &&
+                _display.isFromWarehouse &&
+                (_display.returnItemStatus?.toLowerCase() == 'dropped')) ||
             // Rejected flow: has a pending action
             (_display.orderStatus.toLowerCase().contains('rejected') &&
                 _returnMethod != null) ||
@@ -393,6 +418,8 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             (_display.returnType?.toLowerCase() == 'replacement' &&
                 !_replacementAllowed &&
                 _returnMethod != null));
+
+    debugPrint('showConfirm: $showConfirm');
 
     return Column(
       children: [
@@ -885,11 +912,18 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       final isRejectedReceived =
           ret.orderStatus.toLowerCase() == 'rejected_received' ||
           itemStatus == 'rejected_received';
+      // For warehouse-rejected refunds: enable pickup when item is dropped at warehouse
+      final isWarehouseRejected =
+          itemStatus == 'dropped' && ret.isFromWarehouse;
       isPickedDone =
           itemStatus == 'rejected_picked' || itemStatus == 'rejected_dropped';
       isDroppedDone = itemStatus == 'rejected_dropped';
-      canTapPicked = isRejectedReceived && !isPickedDone;
-      canTapDropped = isRejectedReceived && isPickedDone && !isDroppedDone;
+      canTapPicked =
+          (isRejectedReceived || isWarehouseRejected) && !isPickedDone;
+      canTapDropped =
+          (isRejectedReceived || isWarehouseRejected) &&
+          isPickedDone &&
+          !isDroppedDone;
     } else {
       final source = ret.isFromWarehouse ? 'Warehouse' : 'Delivery Hub';
       pickedLabel = 'Picked Up';

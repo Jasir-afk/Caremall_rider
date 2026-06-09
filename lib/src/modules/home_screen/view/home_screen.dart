@@ -2,6 +2,7 @@ import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
+import 'package:care_mall_rider/src/modules/home_screen/controller/home_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -165,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .catchError((e) {
             if (mounted) setState(() => _ordersError = e.toString());
           }),
-      OrderRepo.getDeliveryOrders(page: 1, limit: 1000)
+      OrderRepo.getDeliveryOrders(page: 1, limit: 100)
           .then((orders) {
             if (mounted) {
               setState(() {
@@ -181,7 +182,10 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             }
           }),
-      ReturnRepo.getReturnOrders()
+      ReturnRepo.getReturnOrders(
+            page: 1,
+            limit: 50, // Increased limit to fetch more orders
+          )
           .then((returns) async {
             debugPrint('=== RETURN ORDERS FETCH START ===');
             debugPrint('Fetched ${returns.length} return orders');
@@ -494,8 +498,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 scale: 0.8,
                                 child: Switch(
                                   value: _isOnline,
-                                  onChanged: (val) =>
-                                      setState(() => _isOnline = val),
+                                  onChanged: (val) async {
+                                    setState(() => _isOnline = val);
+                                    // Call the controller method to sync with API
+                                    if (Get.isRegistered<HomeController>()) {
+                                      final controller =
+                                          Get.find<HomeController>();
+                                      await controller.toggleOnlineStatus(val);
+                                    }
+                                  },
                                   activeThumbColor: AppColors.primarycolor,
                                   activeTrackColor: AppColors.primarycolor
                                       .withValues(alpha: 0.2),
@@ -1434,7 +1445,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         child: AppText(
                           text: isRejected
-                              ? 'Start Delivery'
+                              ? 'Start Refund'
                               : ret.returnType?.toLowerCase() == 'replacement'
                               ? 'Start Replacement'
                               : 'Start Refund',

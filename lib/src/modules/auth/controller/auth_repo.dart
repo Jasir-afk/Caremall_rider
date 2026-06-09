@@ -50,8 +50,13 @@ class AuthRepo {
         };
       }
     } catch (e) {
-      if (e is http.ClientException || e.toString().contains('SocketException')) {
-        return {'success': false, 'message': 'Failed to connect to server. Please check your internet connection or server status.'};
+      if (e is http.ClientException ||
+          e.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'message':
+              'Failed to connect to server. Please check your internet connection or server status.',
+        };
       }
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }
@@ -109,8 +114,108 @@ class AuthRepo {
         };
       }
     } catch (e) {
-      if (e is http.ClientException || e.toString().contains('SocketException')) {
-        return {'success': false, 'message': 'Failed to connect to server. Please check your internet connection or server status.'};
+      if (e is http.ClientException ||
+          e.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'message':
+              'Failed to connect to server. Please check your internet connection or server status.',
+        };
+      }
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+
+  /// Gets the rider's current online status
+  ///
+  /// Parameters:
+  /// - [token]: Authentication token
+  ///
+  /// Returns a Map with API response data
+  static Future<Map<String, dynamic>> getOnlineStatus({
+    required String token,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse(ApiUrls.onlineStatus),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true, 'data': responseData['data']};
+      } else {
+        return {
+          'success': false,
+          'message':
+              responseData['message'] ??
+              'Failed to get status. Please try again.',
+          'data': responseData,
+        };
+      }
+    } catch (e) {
+      if (e is http.ClientException ||
+          e.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'message':
+              'Failed to connect to server. Please check your internet connection or server status.',
+        };
+      }
+      return {'success': false, 'message': 'Network error: ${e.toString()}'};
+    }
+  }
+
+  /// Toggles the rider's online status
+  ///
+  /// Parameters:
+  /// - [isOnline]: Boolean indicating online status (true for online, false for offline)
+  /// - [token]: Authentication token
+  ///
+  /// Returns a Map with API response data
+  static Future<Map<String, dynamic>> toggleOnlineStatus({
+    required bool isOnline,
+    required String token,
+  }) async {
+    try {
+      final response = await http.put(
+        Uri.parse(ApiUrls.toggleOnlineStatus),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'isOnline': isOnline}),
+      );
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Status updated successfully!',
+          'data': responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message':
+              responseData['message'] ??
+              'Failed to update status. Please try again.',
+          'data': responseData,
+        };
+      }
+    } catch (e) {
+      if (e is http.ClientException ||
+          e.toString().contains('SocketException')) {
+        return {
+          'success': false,
+          'message':
+              'Failed to connect to server. Please check your internet connection or server status.',
+        };
       }
       return {'success': false, 'message': 'Network error: ${e.toString()}'};
     }

@@ -348,12 +348,12 @@ class _HeroHeader extends StatelessWidget {
                         color: AppColors.primarycolor.withValues(alpha: 0.1),
                         textColor: AppColors.primarycolor,
                       ),
-                      SizedBox(width: 8.w),
-                      _Chip(
-                        label: '⭐  Gold Rider',
-                        color: Colors.amber.withValues(alpha: 0.1),
-                        textColor: Colors.amber[800]!,
-                      ),
+                      // SizedBox(width: 8.w),
+                      // _Chip(
+                      //   label: '⭐  Gold Rider',
+                      //   color: Colors.amber.withValues(alpha: 0.1),
+                      //   textColor: Colors.amber[800]!,
+                      // ),
                     ],
                   ),
                 ],

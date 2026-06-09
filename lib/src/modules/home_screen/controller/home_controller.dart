@@ -1,4 +1,5 @@
 import 'package:care_mall_rider/core/services/storage_service.dart';
+import 'package:care_mall_rider/src/modules/auth/controller/auth_repo.dart';
 import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/delivery_order_model.dart';
 import 'package:care_mall_rider/src/modules/return/controller/return_repo.dart';
@@ -90,6 +91,7 @@ class HomeController extends GetxController {
   void onInit() {
     super.onInit();
     loadUserData();
+    fetchOnlineStatus();
     fetchOrders();
     setupScrollListeners();
   }
@@ -108,6 +110,50 @@ class HomeController extends GetxController {
     final avatar = await StorageService.getUserAvatar();
     if (name != null && name.isNotEmpty) userName.value = name;
     if (avatar != null) userAvatar.value = avatar;
+  }
+
+  /// Fetch online status from API
+  Future<void> fetchOnlineStatus() async {
+    try {
+      final token = await StorageService.getAuthToken();
+      if (token == null || token.isEmpty) {
+        // Try to get from local storage if no token
+        final localStatus = await StorageService.getOnlineStatus();
+        if (localStatus != null) {
+          isOnline.value = localStatus;
+        }
+        return;
+      }
+
+      final response = await AuthRepo.getOnlineStatus(token: token);
+      if (response['success'] == true) {
+        final data = response['data'];
+        // Try multiple possible response structures
+        final bool? apiStatus =
+            data?['isOnline'] ??
+            data?['is_online'] ??
+            data?['online'] ??
+            data?['status'];
+        if (apiStatus != null) {
+          isOnline.value = apiStatus;
+          // Save to local storage
+          await StorageService.saveOnlineStatus(apiStatus);
+        }
+      } else {
+        // Fallback to local storage on API failure
+        final localStatus = await StorageService.getOnlineStatus();
+        if (localStatus != null) {
+          isOnline.value = localStatus;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching online status: $e');
+      // Fallback to local storage on error
+      final localStatus = await StorageService.getOnlineStatus();
+      if (localStatus != null) {
+        isOnline.value = localStatus;
+      }
+    }
   }
 
   /// Setup scroll listeners for pagination
@@ -133,7 +179,7 @@ class HomeController extends GetxController {
 
   /// Fetch orders, returns, and dashboard stats
   Future<void> fetchOrders({bool loadMore = false}) async {
-    // Check KYC status
+    // Check KYC status once and cache result
     final kycStatus = await StorageService.getKycStatus();
     final kycStatusLower = kycStatus.toLowerCase();
 
@@ -160,13 +206,15 @@ class HomeController extends GetxController {
       hasMoreOrders.value = true;
     }
 
-    // Fetch data in parallel
+    // Fetch data in parallel - return orders moved to end as it's now parallelized
     await Future.wait([
       _fetchDeliveryOrders(loadMore),
       _fetchAllOrdersForCounts(),
-      _fetchReturnOrders(),
       _fetchDashboardStats(),
     ]);
+
+    // Fetch return orders separately to avoid blocking other data
+    await _fetchReturnOrders();
 
     ordersLoading.value = false;
     returnsLoading.value = false;
@@ -195,7 +243,8 @@ class HomeController extends GetxController {
 
   Future<void> _fetchAllOrdersForCounts() async {
     try {
-      final orders = await OrderRepo.getDeliveryOrders(page: 1, limit: 1000);
+      // Reduced from 1000 to 100 - sufficient for counts and much faster
+      final orders = await OrderRepo.getDeliveryOrders(page: 1, limit: 100);
       allOrdersForCounts.assignAll(orders);
     } catch (e) {
       debugPrint('Error fetching all orders for counts: $e');
@@ -207,17 +256,22 @@ class HomeController extends GetxController {
 
   Future<void> _fetchReturnOrders() async {
     try {
-      final returns = await ReturnRepo.getReturnOrders();
-      // Fetch details for all return orders
-      for (int i = 0; i < returns.length; i++) {
+      // Fetch with a higher limit to get all orders including old ones
+      final returns = await ReturnRepo.getReturnOrders(
+        page: 1,
+        limit: 100, // Increased limit to fetch more orders
+      );
+      // Fetch details for all return orders in parallel instead of sequentially
+      final detailFutures = returns.map((r) async {
         try {
-          final detail = await ReturnRepo.getReturnDetail(returns[i].id);
-          returns[i] = detail;
+          return await ReturnRepo.getReturnDetail(r.id);
         } catch (e) {
-          debugPrint('Failed to fetch detail for order at index $i: $e');
+          debugPrint('Failed to fetch detail for order ${r.id}: $e');
+          return r; // Return original if detail fetch fails
         }
-      }
-      returnOrders.assignAll(returns);
+      }).toList();
+      final detailedReturns = await Future.wait(detailFutures);
+      returnOrders.assignAll(detailedReturns);
     } catch (e) {
       returnsError.value = e.toString();
     }
@@ -418,8 +472,31 @@ class HomeController extends GetxController {
     selectedIndex.value = index;
   }
 
-  void toggleOnlineStatus(bool value) {
+  Future<void> toggleOnlineStatus(bool value) async {
     isOnline.value = value;
+    // Save to local storage immediately for UI responsiveness
+    await StorageService.saveOnlineStatus(value);
+
+    // Try to sync with API
+    try {
+      final token = await StorageService.getAuthToken();
+      if (token != null && token.isNotEmpty) {
+        final response = await AuthRepo.toggleOnlineStatus(
+          isOnline: value,
+          token: token,
+        );
+        if (response['success'] != true) {
+          debugPrint(
+            'Failed to update online status on server: ${response['message']}',
+          );
+          // Revert to local storage value on API failure
+          isOnline.value = value;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error toggling online status: $e');
+      // Keep local value even if API fails
+    }
   }
 
   void updateSearchQuery(String value) {
@@ -439,6 +516,7 @@ class HomeController extends GetxController {
   }
 
   void refreshOrders() {
+    fetchOnlineStatus();
     fetchOrders();
   }
 }

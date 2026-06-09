@@ -9,6 +9,7 @@ class StorageService {
   static const String _userAvatarKey = 'user_avatar';
   static const String _userAddressKey = 'user_address';
   static const String _kycStatusKey = 'kyc_status';
+  static const String _onlineStatusKey = 'online_status';
 
   static SharedPreferences? _prefs;
 
@@ -133,6 +134,18 @@ class StorageService {
     return lowerStatus == 'approved' || lowerStatus == 'verified';
   }
 
+  /// Save online status
+  static Future<bool> saveOnlineStatus(bool isOnline) async {
+    final prefs = await _instance;
+    return await prefs.setBool(_onlineStatusKey, isOnline);
+  }
+
+  /// Get saved online status
+  static Future<bool?> getOnlineStatus() async {
+    final prefs = await _instance;
+    return prefs.getBool(_onlineStatusKey);
+  }
+
   /// Clear all authentication data
   static Future<bool> clearAuthData() async {
     final prefs = await _instance;
@@ -143,6 +156,7 @@ class StorageService {
     await prefs.remove(_userAvatarKey);
     await prefs.remove(_userAddressKey);
     await prefs.remove(_kycStatusKey);
+    await prefs.remove(_onlineStatusKey);
     return true;
   }
 

@@ -82,4 +82,8 @@ class ApiUrls {
       '$baseURL/api/v1/rider/auth/me'; // GET – get rider profile
   static String get updateProfile =>
       '$baseURL/api/v1/rider/auth/me'; // PATCH – update rider profile
+  static String get onlineStatus =>
+      '$baseURL/api/v1/rider/auth/online-status'; // GET – get online status
+  static String get toggleOnlineStatus =>
+      '$baseURL/api/v1/rider/auth/online-status'; // PUT – toggle online status
 }

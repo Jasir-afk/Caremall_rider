@@ -238,7 +238,12 @@ class OrderRepo {
   }
 
   /// Fetch all return orders assigned to this rider.
-  static Future<List<ReturnOrder>> getReturnOrders() async {
+  static Future<List<ReturnOrder>> getReturnOrders({
+    int page = 1,
+    int limit = 100,
+    String search = '',
+    String status = '',
+  }) async {
     final isKycApproved = await StorageService.isKycApproved();
     if (!isKycApproved) {
       final kycStatus = await StorageService.getKycStatus();
@@ -251,7 +256,9 @@ class OrderRepo {
     final token = await StorageService.getAuthToken();
 
     final response = await http.get(
-      Uri.parse(ApiUrls.returnsOrders),
+      Uri.parse(
+        '${ApiUrls.returnsOrders}?page=$page&limit=$limit&search=$search&status=$status',
+      ),
       headers: {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',

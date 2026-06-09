@@ -18,6 +18,7 @@ class AuthController extends GetxController {
   final userEmail = ''.obs;
   final userAvatar = ''.obs;
   final authToken = ''.obs;
+  final isOnline = false.obs;
 
   void onInit() {
     super.onInit();
@@ -32,12 +33,19 @@ class AuthController extends GetxController {
     final savedName = await StorageService.getUserName();
     final savedEmail = await StorageService.getUserEmail();
     final savedAvatar = await StorageService.getUserAvatar();
+    final savedOnlineStatus = await StorageService.getOnlineStatus();
 
     if (savedToken != null) authToken.value = savedToken;
     if (savedPhone != null) phoneNumber.value = savedPhone;
     if (savedName != null) userName.value = savedName;
     if (savedEmail != null) userEmail.value = savedEmail;
     if (savedAvatar != null) userAvatar.value = savedAvatar;
+    if (savedOnlineStatus != null) isOnline.value = savedOnlineStatus;
+
+    // Fetch online status from server if user is logged in
+    if (authToken.value.isNotEmpty) {
+      await fetchOnlineStatus();
+    }
   }
 
   /// Sends OTP for login
@@ -248,6 +256,7 @@ class AuthController extends GetxController {
     userEmail.value = '';
     userAvatar.value = '';
     authToken.value = '';
+    isOnline.value = false;
     isLoading.value = false;
     isResendingOtp.value = false;
     // Clear persistent storage
@@ -257,5 +266,66 @@ class AuthController extends GetxController {
   /// Check if user is currently logged in
   Future<bool> isLoggedIn() async {
     return await StorageService.isLoggedIn();
+  }
+
+  /// Fetches the rider's current online status from server
+  Future<void> fetchOnlineStatus() async {
+    if (authToken.value.isEmpty) return;
+
+    try {
+      final result = await AuthRepo.getOnlineStatus(token: authToken.value);
+
+      if (result['success'] && result['data'] != null) {
+        final bool serverOnlineStatus = result['data']['isOnline'] ?? false;
+        isOnline.value = serverOnlineStatus;
+        // Save to persistent storage
+        await StorageService.saveOnlineStatus(serverOnlineStatus);
+      }
+    } catch (e) {
+      // Silently fail - use cached status if fetch fails
+      if (kDebugMode) {
+        print('Failed to fetch online status: ${e.toString()}');
+      }
+    }
+  }
+
+  /// Toggles the rider's online status
+  ///
+  /// Parameters:
+  /// - [onSuccess]: Callback function when status is toggled successfully
+  /// - [onError]: Callback function when there's an error
+  Future<void> toggleOnlineStatus({
+    Function? onSuccess,
+    Function(String)? onError,
+  }) async {
+    isLoading.value = true;
+
+    try {
+      final result = await AuthRepo.toggleOnlineStatus(
+        isOnline: !isOnline.value,
+        token: authToken.value,
+      );
+
+      if (result['success']) {
+        // Update the online status
+        isOnline.value = !isOnline.value;
+        // Save to persistent storage
+        await StorageService.saveOnlineStatus(isOnline.value);
+
+        AppSnackbar.showSuccess(title: 'Success', message: result['message']);
+        if (onSuccess != null) onSuccess();
+      } else {
+        AppSnackbar.showError(title: 'Error', message: result['message']);
+        if (onError != null) onError(result['message']);
+      }
+    } catch (e) {
+      AppSnackbar.showError(
+        title: 'Error',
+        message: 'Failed to update status: ${e.toString()}',
+      );
+      if (onError != null) onError(e.toString());
+    } finally {
+      isLoading.value = false;
+    }
   }
 }

@@ -253,7 +253,10 @@ Future<TodayRoute> fetchTodayRoute({
       // Sync with actual delivery orders to override stale backend statuses
       try {
         final actualOrders = await OrderRepo.getDeliveryOrders();
-        final returnOrders = await ReturnRepo.getReturnOrders();
+        final returnOrders = await ReturnRepo.getReturnOrders(
+          page: 1,
+          limit: 100, // Increased limit to fetch more orders
+        );
 
         // Fetch details for ALL return orders to get returnItemStatus
         for (int i = 0; i < returnOrders.length; i++) {
@@ -725,7 +728,10 @@ class _StopCard extends StatelessWidget {
       onTap: () async {
         if (stop.type == 'return') {
           try {
-            final returnOrders = await ReturnRepo.getReturnOrders();
+            final returnOrders = await ReturnRepo.getReturnOrders(
+              page: 1,
+              limit: 100, // Increased limit to fetch more orders
+            );
             final returnOrder = returnOrders.firstWhere(
               (r) => r.returnId == stop.orderId,
               orElse: () => throw Exception('Return order not found'),

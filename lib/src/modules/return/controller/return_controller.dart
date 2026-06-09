@@ -30,7 +30,11 @@ class ReturnController extends GetxController {
       isLoading.value = true;
       errorMessage.value = null;
 
-      final orders = await ReturnRepo.getReturnOrders();
+      // Fetch with a higher limit to get all orders including old ones
+      final orders = await ReturnRepo.getReturnOrders(
+        page: 1,
+        limit: 100, // Increased limit to fetch more orders
+      );
       // Fetch details for all return orders to get returnItemStatus
       for (int i = 0; i < orders.length; i++) {
         try {
