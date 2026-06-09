@@ -26,6 +26,8 @@ class _AssetsIconsGen {
   // PNG logo as fallback
   AssetGenImage get appLogoPng =>
       const AssetGenImage('assets/icons/app_logo.png');
+  AssetGenImage get splashScreenLogo =>
+      const AssetGenImage('assets/icons/splash_screen_logo.png');
 }
 
 /// -----------------------------

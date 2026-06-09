@@ -259,6 +259,7 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
+
 class _StatItem extends StatelessWidget {
   final String label;
   final String value;
@@ -353,6 +354,7 @@ class _OrderCard extends StatelessWidget {
         return const Color(0xFFF3F4F6);
     }
   }
+
   String get _statusLabel =>
       order.orderStatus.replaceAll('_', ' ').toUpperCase();
 

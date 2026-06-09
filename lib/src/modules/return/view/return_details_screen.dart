@@ -491,13 +491,13 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
                     letterSpacing: -0.5,
                   ),
                 ),
-                if (ret.createdAt != null) ...[
-                  SizedBox(height: 2.h),
-                  Text(
-                    _formatDate(ret.createdAt!),
-                    style: TextStyle(fontSize: 11.sp, color: _labelGrey),
-                  ),
-                ],
+                // if (ret.createdAt != null) ...[
+                //   SizedBox(height: 2.h),
+                //   // Text(
+                //   //   // _formatDate(ret.createdAt!),
+                //   //   // style: TextStyle(fontSize: 11.sp, color: _labelGrey),
+                //   // ),
+                // ],
               ],
             ),
           ),
@@ -1702,30 +1702,30 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     }
   }
 
-  String _formatDate(DateTime dt) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final hour = dt.hour > 12
-        ? dt.hour - 12
-        : dt.hour == 0
-        ? 12
-        : dt.hour;
-    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-    final min = dt.minute.toString().padLeft(2, '0');
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}, $hour:$min $ampm';
-  }
+  // String _formatDate(DateTime dt) {
+  //   const months = [
+  //     'Jan',
+  //     'Feb',
+  //     'Mar',
+  //     'Apr',
+  //     'May',
+  //     'Jun',
+  //     'Jul',
+  //     'Aug',
+  //     'Sep',
+  //     'Oct',
+  //     'Nov',
+  //     'Dec',
+  //   ];
+  //   final hour = dt.hour > 12
+  //       ? dt.hour - 12
+  //       : dt.hour == 0
+  //       ? 12
+  //       : dt.hour;
+  //   final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+  //   final min = dt.minute.toString().padLeft(2, '0');
+  //   return '${dt.day} ${months[dt.month - 1]} ${dt.year}, $hour:$min $ampm';
+  // }
 }
 
 // ── Data class ─────────────────────────────────────────────────────────────

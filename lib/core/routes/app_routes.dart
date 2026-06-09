@@ -11,7 +11,6 @@ import 'package:care_mall_rider/src/modules/kyc/view/kyc_verification_screen.dar
 
 class AppRoutes {
   AppRoutes._();
-
   static const String initial = '/';
   static const String splash = '/splash';
   static const String login = '/login';
@@ -24,9 +23,7 @@ class AppRoutes {
 
 class AppPages {
   AppPages._();
-
   static const initial = AppRoutes.splash;
-
   static final routes = [
     GetPage(name: AppRoutes.splash, page: () => const SplashScreen()),
     GetPage(

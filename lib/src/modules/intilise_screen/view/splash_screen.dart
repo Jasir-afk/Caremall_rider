@@ -1,5 +1,3 @@
-import 'package:care_mall_rider/app/commenwidget/apptext.dart';
-import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/core/routes/app_routes.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
@@ -14,10 +12,24 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  double _opacity = 0.0;
+
   void initState() {
     super.initState();
+    _animateOpacity();
     _navigate();
+  }
+
+  void _animateOpacity() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() {
+          _opacity = 1.0;
+        });
+      }
+    });
   }
 
   Future<void> _navigate() async {
@@ -49,37 +61,26 @@ class _SplashScreenState extends State<SplashScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // App Logo
-              SizedBox(
-                width: 200.w,
-                height: 200.h,
-                child: Assets.icons.appLogoPng.image(fit: BoxFit.contain),
-              ),
-              SizedBox(height: 24.h),
-              // App Title
-              AppText(
-                text: 'Care Mall Rider',
-                fontSize: 28.sp,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textnaturalcolor,
-              ),
-              SizedBox(height: 8.h),
-              // Tagline
-              AppText(
-                text: 'Partner with us to earn',
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w400,
-                color: AppColors.textDefaultSecondarycolor,
-              ),
-              SizedBox(height: 48.h),
-              // Loading Indicator
-              SizedBox(
-                width: 40.w,
-                height: 40.h,
-                child: CircularProgressIndicator(
-                  color: AppColors.primarycolor,
-                  strokeWidth: 3,
+              AnimatedOpacity(
+                opacity: _opacity,
+                duration: const Duration(seconds: 2),
+                curve: Curves.easeInOut,
+                child: SizedBox(
+                  width: 400.w,
+                  height: 400.h,
+                  child: Assets.icons.splashScreenLogo.image(
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
+              // SizedBox(
+              //   width: 40.w,
+              //   height: 40.h,
+              //   child: CircularProgressIndicator(
+              //     color: AppColors.primarycolor,
+              //     strokeWidth: 3,
+              //   ),
+              // ),
             ],
           ),
         ),

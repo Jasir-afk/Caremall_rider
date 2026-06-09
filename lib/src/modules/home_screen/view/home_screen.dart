@@ -525,38 +525,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (_selectedIndex == 0) ...[
                     _buildDashboard(),
                     SizedBox(height: 16.h),
-                    // // ─── Search Bar ──────────────────────────────────────────────────
-                    // Padding(
-                    //   padding: EdgeInsets.symmetric(horizontal: 16.w),
-                    //   child: Container(
-                    //     decoration: BoxDecoration(
-                    //       color: Colors.white,
-                    //       borderRadius: BorderRadius.circular(8.r),
-                    //       border: Border.all(color: Colors.grey[200]!),
-                    //     ),
-                    //     child: TextField(
-                    //       decoration: InputDecoration(
-                    //         hintText: 'Search Order ID',
-                    //         hintStyle: TextStyle(
-                    //           color: Colors.grey[400],
-                    //           fontSize: 14.sp,
-                    //         ),
-                    //         prefixIcon: Icon(
-                    //           Icons.search,
-                    //           color: Colors.grey[400],
-                    //         ),
-                    //         border: InputBorder.none,
-                    //         contentPadding: EdgeInsets.symmetric(
-                    //           horizontal: 16.w,
-                    //           vertical: 14.h,
-                    //         ),
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
-                    // SizedBox(height: 16.h),
 
-                    // ─── Tabs ────────────────────────────────────────────────────────────────
                     Container(
                       height: 45.h,
                       margin: EdgeInsets.symmetric(horizontal: 16.w),
@@ -1372,7 +1341,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           '_',
                         );
 
-                    final bool isDropped = ret.isDropped;
                     final bool isCompleted =
                         // Rejected orders: only complete when rider has returned item to customer
                         (isRejected && itemStatusClean == 'rejected_dropped') ||
@@ -1388,50 +1356,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                     'completed' ||
                                 ret.replacementDeliveryStatus?.toLowerCase() ==
                                     'delivered'));
-
-                    // Show "Dropped" state when item is dropped at hub but not yet completed
-                    final bool showDropped = isDropped && !isCompleted;
-
-                    if (showDropped) {
-                      return GestureDetector(
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ReturnDetailsScreen(returnOrder: ret),
-                            ),
-                          );
-                          if (result == true && mounted) {
-                            _fetchOrders();
-                          }
-                        },
-                        child: Container(
-                          height: 36.h,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE6F4EE),
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.check_circle,
-                                color: const Color(0xFF1E7E4C),
-                                size: 14.sp,
-                              ),
-                              SizedBox(width: 4.w),
-                              AppText(
-                                text: 'Dropped',
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1E7E4C),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
 
                     if (isCompleted) {
                       final bool showAsRejectedDropped =
