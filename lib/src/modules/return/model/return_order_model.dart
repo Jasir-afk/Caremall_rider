@@ -20,6 +20,9 @@ class ReturnOrder {
   final String? returnType;
   final Map<String, dynamic>? order;
   final Map<String, dynamic>? user;
+  final DispatchInfo? dispatch;
+  final String?
+  deliveryHub; // For return orders, indicates the delivery hub assignment
   final bool isPicked;
   final bool isDropped;
   ReturnOrder({
@@ -42,6 +45,8 @@ class ReturnOrder {
     this.returnType,
     this.order,
     this.user,
+    this.dispatch,
+    this.deliveryHub,
     this.isPicked = false,
     this.isDropped = false,
   });
@@ -153,6 +158,22 @@ class ReturnOrder {
         ? 'dropped'
         : rawReturnItemStatus;
 
+    // Parse dispatch field - check both top-level and nested order object
+    DispatchInfo? parsedDispatch;
+    if (json['dispatch'] is Map) {
+      parsedDispatch = DispatchInfo.fromJson(
+        json['dispatch'] as Map<String, dynamic>,
+      );
+    } else if (orderObj is Map && orderObj['dispatch'] is Map) {
+      // Fallback to dispatch from the nested order object
+      parsedDispatch = DispatchInfo.fromJson(
+        orderObj['dispatch'] as Map<String, dynamic>,
+      );
+    }
+
+    // Parse deliveryHub field for return orders
+    final deliveryHub = json['deliveryHub']?.toString();
+
     return ReturnOrder(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       returnId: (json['returnId'] ?? json['_id'] ?? '').toString(),
@@ -180,6 +201,8 @@ class ReturnOrder {
           .toString(),
       order: orderObj is Map<String, dynamic> ? orderObj : null,
       user: customer is Map<String, dynamic> ? customer : null,
+      dispatch: parsedDispatch,
+      deliveryHub: deliveryHub,
       isPicked:
           json['isPicked'] == true ||
           (returnItemStatus?.toLowerCase().contains('picked') ?? false) ||
@@ -200,6 +223,8 @@ class ReturnOrder {
     String? pickupStatus,
     String? pickStatus,
     String? refundStatus,
+    DispatchInfo? dispatch,
+    String? deliveryHub,
   }) {
     return ReturnOrder(
       id: id,
@@ -211,10 +236,10 @@ class ReturnOrder {
       customerPhone: customerPhone,
       address: address,
       createdAt: createdAt,
-      pickupStatus: pickupStatus ?? this.pickupStatus, // ✅ add this
+      pickupStatus: pickupStatus ?? this.pickupStatus,
       returnItemStatus: returnItemStatus ?? this.returnItemStatus,
-      refundStatus: refundStatus ?? this.refundStatus, // ✅ add this
-      pickStatus: pickStatus ?? this.pickStatus, // ✅ add this
+      refundStatus: refundStatus ?? this.refundStatus,
+      pickStatus: pickStatus ?? this.pickStatus,
       replacementDeliveryStatus:
           replacementDeliveryStatus ?? this.replacementDeliveryStatus,
       pickupPhotos: pickupPhotos,
@@ -222,6 +247,8 @@ class ReturnOrder {
       returnType: returnType,
       order: order,
       user: user,
+      dispatch: dispatch ?? this.dispatch,
+      deliveryHub: deliveryHub ?? this.deliveryHub,
       isPicked: isPicked ?? this.isPicked,
       isDropped: isDropped ?? this.isDropped,
     );
@@ -240,8 +267,69 @@ class ReturnOrder {
       refundStatus: 'pending',
       pickStatus: 'pending',
       returnType: 'refund',
+      dispatch: order.dispatch,
       isPicked: false,
       isDropped: false,
     );
+  }
+
+  /// Is this return order assigned from a warehouse?
+  bool get isFromWarehouse {
+    // For return orders, check deliveryHub field first
+    if (deliveryHub != null && deliveryHub!.isNotEmpty) {
+      // If deliveryHub is set, it's from a delivery hub, not warehouse
+      return false;
+    }
+
+    // Fallback to dispatch.riderAssignedBy if available
+    final riderAssignedBy = dispatch?.riderAssignedBy?.toLowerCase();
+    if (riderAssignedBy != null) {
+      return riderAssignedBy == 'warehouse';
+    }
+
+    // If dispatch info is missing, check if we can infer from the order object
+    if (order != null && order is Map<String, dynamic>) {
+      final orderMap = order as Map<String, dynamic>;
+      final orderDispatch = orderMap['dispatch'];
+      if (orderDispatch is Map<String, dynamic>) {
+        final riderAssigned = orderDispatch['riderAssignedBy']
+            ?.toString()
+            .toLowerCase();
+        return riderAssigned == 'warehouse';
+      }
+    }
+
+    // Default to true (warehouse) if deliveryHub is not set
+    return true;
+  }
+
+  /// Is this return order assigned from a delivery hub?
+  bool get isFromDeliveryHub {
+    // For return orders, check deliveryHub field first
+    if (deliveryHub != null && deliveryHub!.isNotEmpty) {
+      // If deliveryHub is set, it's from a delivery hub
+      return true;
+    }
+
+    // Fallback to dispatch.riderAssignedBy if available
+    final riderAssignedBy = dispatch?.riderAssignedBy?.toLowerCase();
+    if (riderAssignedBy != null) {
+      return riderAssignedBy == 'delivery_hub';
+    }
+
+    // If dispatch info is missing, check if we can infer from the order object
+    if (order != null && order is Map<String, dynamic>) {
+      final orderMap = order as Map<String, dynamic>;
+      final orderDispatch = orderMap['dispatch'];
+      if (orderDispatch is Map<String, dynamic>) {
+        final riderAssigned = orderDispatch['riderAssignedBy']
+            ?.toString()
+            .toLowerCase();
+        return riderAssigned == 'delivery_hub';
+      }
+    }
+
+    // Default to false if deliveryHub is not set
+    return false;
   }
 }

@@ -98,6 +98,14 @@ class DeliveryOrder {
   /// The amount that actually needs to be collected.
   /// If COD, add a 40 rupees charge.
   double get amountToCollect => isCod ? totalAmount + 40 : totalAmount;
+
+  /// Is this order assigned from a warehouse?
+  bool get isFromWarehouse =>
+      dispatch?.riderAssignedBy?.toLowerCase() == 'warehouse';
+
+  /// Is this order assigned from a delivery hub?
+  bool get isFromDeliveryHub =>
+      dispatch?.riderAssignedBy?.toLowerCase() == 'delivery_hub';
 }
 
 class OrderItem {
@@ -218,6 +226,7 @@ class DispatchInfo {
   final double amount;
   final String status;
   final DateTime? dispatchDate;
+  final String? riderAssignedBy;
 
   DispatchInfo({
     required this.dispatchType,
@@ -228,6 +237,7 @@ class DispatchInfo {
     required this.amount,
     required this.status,
     this.dispatchDate,
+    this.riderAssignedBy,
   });
 
   factory DispatchInfo.fromJson(Map<String, dynamic> json) {
@@ -242,6 +252,7 @@ class DispatchInfo {
       dispatchDate: json['dispatchDate'] != null
           ? DateTime.tryParse(json['dispatchDate'])
           : null,
+      riderAssignedBy: json['riderAssignedBy'],
     );
   }
 }

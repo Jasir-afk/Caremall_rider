@@ -358,6 +358,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _pickUpOrder() async {
+    final source = _display.isFromWarehouse ? 'warehouse' : 'delivery hub';
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
         backgroundColor: Colors.white,
@@ -367,7 +368,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           fontWeight: FontWeight.w700,
         ),
         content: AppText(
-          text: 'Are you picking up this order from the warehouse?',
+          text: 'Are you picking up this order from the $source?',
           fontSize: 14.sp,
         ),
         actions: [
@@ -989,7 +990,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       );
     }
 
-    // New Order - Still at Warehouse
+    // New Order - Pick up from source
     if (_display.isInNewStatus) {
       return Container(
         padding: EdgeInsets.all(16.w),
@@ -1020,13 +1021,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.inventory_2_outlined,
+                      _display.isFromWarehouse
+                          ? Icons.inventory_2_outlined
+                          : Icons.local_shipping_outlined,
                       size: 20.sp,
                       color: Colors.white,
                     ),
                     SizedBox(width: 8.w),
                     AppText(
-                      text: 'Pick From Warehouse',
+                      text: _display.isFromWarehouse
+                          ? 'Pick From Warehouse'
+                          : 'Pick From Delivery Hub',
                       color: Colors.white,
                       fontSize: 15.sp,
                       fontWeight: FontWeight.w700,
@@ -1040,7 +1045,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final isAlreadyUndelivered =
         _display.orderStatus.toLowerCase() == 'undelivered';
     final isWarehouseDropPending =
-        isAlreadyUndelivered && !_display.undeliveredWarehouseDrop;
+        isAlreadyUndelivered &&
+        !_display.undeliveredWarehouseDrop &&
+        _display.isFromWarehouse;
 
     // In Transit - Delivery Actions
     return Container(

@@ -354,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
       .where(
         (o) =>
             _transitStatuses.contains(o.orderStatus.toLowerCase()) &&
-            !o.undeliveredWarehouseDrop,
+            !(o.undeliveredWarehouseDrop && o.isFromWarehouse),
       )
       .toList();
   List<DeliveryOrder> get _historyOrders => _baseOrders
@@ -1506,13 +1506,15 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(height: 8.h),
 
             // Pickup section
-            if (order.dispatch?.destination != null &&
+            if (order.dispatch != null &&
                 order.orderStatus.toLowerCase() != 'delivered') ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    Icons.store_outlined,
+                    order.isFromWarehouse
+                        ? Icons.inventory_2_outlined
+                        : Icons.local_shipping_outlined,
                     size: 14.sp,
                     color: const Color(0xFF6366F1),
                   ),
@@ -1529,7 +1531,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         SizedBox(height: 2.h),
                         AppText(
-                          text: order.dispatch!.destination,
+                          text: order.isFromWarehouse
+                              ? 'Warehouse'
+                              : 'Delivery Hub',
                           fontSize: 12.sp,
                           color: AppColors.textnaturalcolor,
                           maxLines: 1,

@@ -328,7 +328,7 @@ class HomeController extends GetxController {
       .where(
         (o) =>
             transitStatuses.contains(o.orderStatus.toLowerCase()) &&
-            !o.undeliveredWarehouseDrop,
+            !(o.undeliveredWarehouseDrop && o.isFromWarehouse),
       )
       .toList();
 
