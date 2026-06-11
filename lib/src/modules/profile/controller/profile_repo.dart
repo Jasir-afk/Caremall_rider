@@ -119,4 +119,38 @@ class ProfileRepo {
       };
     }
   }
+
+  /// Delete rider account
+  static Future<Map<String, dynamic>> deleteAccount() async {
+    final token = await StorageService.getAuthToken();
+    Log.debug('[ProfileRepo] Deleting account from: ${ApiUrls.deleteAccount}');
+
+    if (token == null) {
+      throw Exception('Authentication token not found. Please log in again.');
+    }
+
+    final response = await http.delete(
+      Uri.parse(ApiUrls.deleteAccount),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    Log.debug('[ProfileRepo] Response status: ${response.statusCode}');
+    Log.debug('[ProfileRepo] Response body: ${response.body}');
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 200) {
+      return {
+        'success': true,
+        'message': body['message'] ?? 'Account deleted successfully',
+      };
+    } else {
+      return {
+        'success': false,
+        'message': body['message'] ?? 'Failed to delete account.',
+      };
+    }
+  }
 }

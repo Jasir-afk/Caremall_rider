@@ -40,6 +40,24 @@ class ReturnController extends GetxController {
         try {
           final detail = await ReturnRepo.getReturnDetail(orders[i].id);
           orders[i] = detail;
+
+          // For replacement orders with 0 price, try to fetch original order price
+          if (detail.returnType?.toLowerCase() == 'replacement' &&
+              detail.totalAmount == 0 &&
+              detail.orderId != null) {
+            try {
+              final originalOrder = await ReturnRepo.getOriginalOrderPrice(
+                detail.orderId!,
+              );
+              if (originalOrder > 0) {
+                orders[i] = detail.copyWith(totalAmount: originalOrder);
+              }
+            } catch (e) {
+              print(
+                'Failed to fetch original order price for ${detail.orderId}: $e',
+              );
+            }
+          }
         } catch (e) {
           print('Failed to fetch detail for order at index $i: $e');
         }
@@ -59,12 +77,36 @@ class ReturnController extends GetxController {
       errorMessage.value = null;
 
       final detail = await ReturnRepo.getReturnDetail(returnId);
-      selectedReturnOrder.value = detail;
+
+      // For replacement orders with 0 price, try to fetch original order price
+      if (detail.returnType?.toLowerCase() == 'replacement' &&
+          detail.totalAmount == 0 &&
+          detail.orderId != null) {
+        try {
+          final originalOrderPrice = await ReturnRepo.getOriginalOrderPrice(
+            detail.orderId!,
+          );
+          if (originalOrderPrice > 0) {
+            selectedReturnOrder.value = detail.copyWith(
+              totalAmount: originalOrderPrice,
+            );
+          } else {
+            selectedReturnOrder.value = detail;
+          }
+        } catch (e) {
+          print(
+            'Failed to fetch original order price for ${detail.orderId}: $e',
+          );
+          selectedReturnOrder.value = detail;
+        }
+      } else {
+        selectedReturnOrder.value = detail;
+      }
 
       // Update in the list if exists
       final index = returnOrders.indexWhere((r) => r.id == returnId);
       if (index != -1) {
-        returnOrders[index] = detail;
+        returnOrders[index] = selectedReturnOrder.value!;
       }
     } catch (e) {
       errorMessage.value = e.toString();

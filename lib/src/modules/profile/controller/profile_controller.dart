@@ -184,4 +184,41 @@ class ProfileController extends GetxController {
     await StorageService.clearAuthData();
     Get.offAllNamed('/login');
   }
+
+  /// Delete rider account
+  Future<void> deleteAccount() async {
+    try {
+      isUpdating.value = true;
+
+      final result = await ProfileRepo.deleteAccount();
+
+      if (result['success'] == true) {
+        // Clear all locally stored authentication data
+        await StorageService.clearAuthData();
+
+        // Show success message
+        AppSnackbar.showSuccess(
+          title: 'Account Deleted',
+          message:
+              result['message'] ??
+              'Your account has been deleted successfully.',
+        );
+
+        // Redirect to login/signup screen
+        Get.offAllNamed('/login');
+      } else {
+        AppSnackbar.showError(
+          title: 'Deletion Failed',
+          message: result['message'] ?? 'Failed to delete account.',
+        );
+      }
+    } catch (e) {
+      AppSnackbar.showError(
+        title: 'Error',
+        message: 'Failed to delete account: $e',
+      );
+    } finally {
+      isUpdating.value = false;
+    }
+  }
 }

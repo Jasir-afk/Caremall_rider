@@ -29,6 +29,10 @@ class LoginScreen extends GetView<AuthController> {
             ),
           );
         },
+        onAccountDeleted: (message) {
+          // Redirect to registration/signup flow
+          Get.to(() => RegisterScreen());
+        },
       );
     }
   }

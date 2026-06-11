@@ -1,9 +1,13 @@
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
+import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
+import 'package:care_mall_rider/src/modules/home_screen/controller/home_controller.dart';
 import 'package:care_mall_rider/src/modules/return/controller/return_repo.dart';
 import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ReturnDetailsScreen extends StatefulWidget {
@@ -51,6 +55,113 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     _fetchDetail();
   }
 
+  /// Check if rider is online, if not show dialog to go online
+  /// Returns true if rider is online or went online, false if cancelled
+  Future<bool> _checkOnlineStatus() async {
+    // Check from storage first
+    final savedStatus = await StorageService.getOnlineStatus();
+    final isOnline = savedStatus ?? true;
+
+    if (!isOnline) {
+      final result = await Get.dialog<bool>(
+        Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(24.w),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                    size: 32.sp,
+                  ),
+                ),
+                SizedBox(height: 20.h),
+                AppText(
+                  text: 'Go Online?',
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textnaturalcolor,
+                ),
+                SizedBox(height: 12.h),
+                AppText(
+                  text:
+                      'You are currently offline. You need to go online to perform this action.',
+                  fontSize: 14.sp,
+                  color: Colors.grey.shade600,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.back(result: false),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          side: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        child: AppText(
+                          text: 'Cancel',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textnaturalcolor,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          // Go online
+                          if (Get.isRegistered<HomeController>()) {
+                            final controller = Get.find<HomeController>();
+                            await controller.toggleOnlineStatus(true);
+                          }
+                          Get.back(result: true);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primarycolor,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: AppText(
+                          text: 'Go Online',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+      return result ?? false;
+    }
+    return true;
+  }
+
   void dispose() {
     _fadeCtrl.dispose();
     super.dispose();
@@ -76,14 +187,30 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             'rejected',
           );
           final replStatus = detail.replacementDeliveryStatus?.toLowerCase();
-          _replacementAllowed =
-              detail.returnType?.toLowerCase() == 'replacement' &&
-              !isRejected &&
-              detail.isDropped &&
-              (replStatus == 'received' ||
-                  replStatus == 'picked' ||
-                  replStatus == 'completed' ||
-                  replStatus == 'delivered');
+          final isFromWarehouse = detail.isFromWarehouse;
+
+          // For warehouse-through-rider: allow from 'received' (rider assigned) onward
+          // For delivery hub: keep original behavior (allow from 'received' onward)
+          if (isFromWarehouse) {
+            _replacementAllowed =
+                detail.returnType?.toLowerCase() == 'replacement' &&
+                !isRejected &&
+                detail.isDropped &&
+                (replStatus == 'received' ||
+                    replStatus == 'picked' ||
+                    replStatus == 'completed' ||
+                    replStatus == 'delivered');
+          } else {
+            // Delivery hub case: keep original behavior
+            _replacementAllowed =
+                detail.returnType?.toLowerCase() == 'replacement' &&
+                !isRejected &&
+                detail.isDropped &&
+                (replStatus == 'received' ||
+                    replStatus == 'picked' ||
+                    replStatus == 'completed' ||
+                    replStatus == 'delivered');
+          }
           _initMethod();
         });
         _fadeCtrl.forward(from: 0);
@@ -129,8 +256,12 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         _returnMethod = 'drop_off';
       } else if (isRejectedReceived) {
         _returnMethod = 'pickup';
+      } else if (itemStatus == 'dropped' && ret.isFromWarehouse) {
+        // Warehouse rejected: item dropped at warehouse, rider needs to pick up
+        _returnMethod = 'pickup';
       } else {
-        _returnMethod = null;
+        // Default to pickup for initial rejected state
+        _returnMethod = 'pickup';
       }
     } else if (isReplacement) {
       if (_replacementAllowed) {
@@ -202,11 +333,16 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     if (isReplacement && isRejected) {
       if (itemStatus.contains('rejected_dropped')) return 3;
       if (itemStatus.contains('rejected_picked')) return 1;
+      // For warehouse rejected: if item is dropped at warehouse, show step 0
+      if (itemStatus == 'dropped' && ret.isFromWarehouse) {
+        return 0;
+      }
       if (orderStatus == 'rejected_received' ||
           itemStatus == 'rejected_received') {
         return 0;
       }
-      return -1;
+      // Default to step 0 for initial rejected state
+      return 0;
     }
 
     if (isRejected) {
@@ -230,12 +366,12 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       if (replStatus == 'completed' ||
           replStatus == 'delivered' ||
           orderStatus == 'completed') {
-        return 2;
+        return 2; // fully delivered
       }
       if (replStatus == 'picked' || _sourcePickConfirmed) {
-        return 1; // picked from source
+        return 1; // picked from source, heading to customer
       }
-      return 0; // 'received' → not started yet
+      return 0; // received, not yet picked
     }
 
     // ── Replacement collection phase (customer → source)
@@ -399,8 +535,16 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             _display.orderStatus.toLowerCase() == 'refunded' ||
             _display.orderStatus.toLowerCase() == 'return_completed') &&
         (
-        // Phase 2 replacement delivery: show when replStatus is 'received' or 'picked'
+        // Phase 2 replacement delivery (warehouse or hub): show when replStatus is 'received' or 'picked'
+        // For warehouse: only allow when status is approved or rejected, NOT requested
         (isReplacementPhase2 &&
+                (_display.isFromWarehouse
+                    ? (_display.orderStatus.toLowerCase() == 'approved' ||
+                              _display.orderStatus.toLowerCase().contains(
+                                'rejected',
+                              )) &&
+                          _display.orderStatus.toLowerCase() != 'requested'
+                    : true) &&
                 (replStatus == 'received' ||
                     replStatus == 'picked' ||
                     _sourcePickConfirmed)) ||
@@ -551,21 +695,21 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       steps = [
         _TimelineStep(
           icon: sourceIcon,
-          label: 'Picked from $source',
-          sublabel: 'Collect item',
+          label: 'Picked',
+          sublabel: 'From $source',
           done: step >= 1,
           active: step == 0,
         ),
         _TimelineStep(
           icon: Icons.person_pin_circle_outlined,
-          label: 'Returned to Customer',
-          sublabel: 'Item returned',
+          label: 'Returned',
+          sublabel: 'To customer',
           done: step >= 2,
           active: step == 1,
         ),
         _TimelineStep(
           icon: Icons.cancel_outlined,
-          label: 'Rejected Closed',
+          label: 'Closed',
           sublabel: 'Case closed',
           done: step >= 3,
           active: step == 2,
@@ -575,33 +719,33 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       steps = [
         _TimelineStep(
           icon: sourceIcon,
-          label: 'Pick from $source',
-          sublabel: 'Collect item',
+          label: 'Pick',
+          sublabel: 'From $source',
           done: step >= 1,
           active: step == 0,
         ),
         _TimelineStep(
           icon: Icons.person_pin_circle_outlined,
           label: 'Delivered',
-          sublabel: 'Back to customer',
+          sublabel: 'To customer',
           done: step >= 2,
           active: step == 1,
         ),
       ];
     } else if (isReplacement && ret.isDropped && _replacementAllowed) {
-      // ── Replacement delivery phase: 2-step (source → customer)
+      // ── Replacement delivery phase: 2-step (picked from source → delivered to customer)
       steps = [
         _TimelineStep(
           icon: sourceIcon,
-          label: 'Picked from $source',
-          sublabel: 'Item collected',
+          label: 'Picked',
+          sublabel: 'From $source',
           done: step >= 1,
           active: step == 0,
         ),
         _TimelineStep(
           icon: Icons.person_pin_circle_outlined,
           label: 'Delivered',
-          sublabel: 'Customer received',
+          sublabel: 'To customer',
           done: step >= 2,
           active: step == 1,
         ),
@@ -610,15 +754,15 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       steps = [
         _TimelineStep(
           icon: Icons.directions_walk_rounded,
-          label: 'Picked from Customer',
+          label: 'Picked',
           sublabel: 'From customer',
           done: step >= 1,
           active: step == 0,
         ),
         _TimelineStep(
           icon: sourceIcon,
-          label: 'Dropped at $source',
-          sublabel: '$source received',
+          label: 'Dropped',
+          sublabel: 'At $source',
           done: step >= 2,
           active: step == 1,
         ),
@@ -627,15 +771,15 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       steps = [
         _TimelineStep(
           icon: Icons.directions_walk_rounded,
-          label: 'Picked from Customer',
+          label: 'Picked',
           sublabel: 'From customer',
           done: true,
           active: false,
         ),
         _TimelineStep(
           icon: sourceIcon,
-          label: 'Dropped at $source',
-          sublabel: '$source received',
+          label: 'Dropped',
+          sublabel: 'At $source',
           done: true,
           active: false,
         ),
@@ -648,15 +792,15 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       steps = [
         _TimelineStep(
           icon: Icons.person_pin_circle_outlined,
-          label: 'Picked Up',
+          label: 'Picked',
           sublabel: 'From customer',
           done: step >= 1,
           active: step == 0,
         ),
         _TimelineStep(
           icon: sourceIcon,
-          label: 'Dropped at $source',
-          sublabel: '$source received',
+          label: 'Dropped',
+          sublabel: 'At $source',
           done: step >= 2,
           active: step == 1,
         ),
@@ -846,9 +990,8 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       final isRejectedReceived =
           ret.orderStatus.toLowerCase() == 'rejected_received' ||
           (ret.returnItemStatus?.toLowerCase() ?? '') == 'rejected_received';
-      final source = ret.isFromWarehouse ? 'Warehouse' : 'Delivery Hub';
-      pickedLabel = 'Picked from $source';
-      droppedLabel = 'Returned to Customer';
+      pickedLabel = 'Picked';
+      droppedLabel = 'Returned';
       pickedIcon = ret.isFromWarehouse
           ? Icons.inventory_2_outlined
           : Icons.local_shipping_outlined;
@@ -867,9 +1010,11 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         // Phase 2: source → customer
         // 'received' = source ready, rider NOT yet picked → show pickup button
         // 'picked'   = rider confirmed pickup → show deliver button
-        final source = ret.isFromWarehouse ? 'Warehouse' : 'Delivery Hub';
-        pickedLabel = 'Picked from $source';
-        droppedLabel = 'Delivered to Customer';
+        final sourceLabel = ret.isFromWarehouse
+            ? 'at Warehouse'
+            : 'at Delivery Hub';
+        pickedLabel = 'Picked $sourceLabel';
+        droppedLabel = 'Delivered';
         pickedIcon = ret.isFromWarehouse
             ? Icons.inventory_2_outlined
             : Icons.local_shipping_outlined;
@@ -885,9 +1030,8 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         canTapDropped = isPickedDone && !isDroppedDone;
       } else {
         // Phase 1: customer → source
-        final source = ret.isFromWarehouse ? 'Warehouse' : 'Delivery Hub';
-        pickedLabel = 'Picked from Customer';
-        droppedLabel = 'Dropped at $source';
+        pickedLabel = 'Picked';
+        droppedLabel = 'Dropped';
         pickedIcon = Icons.directions_walk_rounded;
         droppedIcon = ret.isFromWarehouse
             ? Icons.inventory_2_outlined
@@ -898,8 +1042,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         canTapDropped = isPicked && !isDropped;
       }
     } else if (isRejected) {
-      final source = ret.isFromWarehouse ? 'Warehouse' : 'Delivery Hub';
-      pickedLabel = 'Pick from $source';
+      pickedLabel = 'Pick';
       droppedLabel = 'Delivered';
       pickedIcon = ret.isFromWarehouse
           ? Icons.inventory_2_outlined
@@ -925,9 +1068,8 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
           isPickedDone &&
           !isDroppedDone;
     } else {
-      final source = ret.isFromWarehouse ? 'Warehouse' : 'Delivery Hub';
-      pickedLabel = 'Picked Up';
-      droppedLabel = 'Dropped at $source';
+      pickedLabel = 'Picked';
+      droppedLabel = 'Dropped';
       pickedIcon = Icons.directions_walk_rounded;
       droppedIcon = ret.isFromWarehouse
           ? Icons.inventory_2_outlined
@@ -1231,9 +1373,14 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     if (isReplacement && !isRejected) {
       if (_replacementAllowed) {
         final source = _display.isFromWarehouse ? 'Warehouse' : 'Delivery Hub';
-        return _returnMethod == 'pickup'
-            ? 'Picked from $source' // Step A: rider picks from source
-            : 'Delivered to Customer'; // Step B: rider delivers to customer
+        if (_returnMethod == 'pickup') {
+          // Warehouse direct-assign: rider picks from warehouse
+          return _display.isFromWarehouse
+              ? 'Picked at Warehouse'
+              : 'Picked from $source';
+        } else {
+          return 'Delivered to Customer'; // Step B: rider delivers to customer
+        }
       } else {
         final source = _display.isFromWarehouse ? 'Warehouse' : 'Delivery Hub';
         return _returnMethod == 'pickup'
@@ -1373,6 +1520,10 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
 
   // ── Confirm Action ─────────────────────────────────────────────────────────
   Future<void> _confirmAction() async {
+    // Check if rider is online
+    final isOnline = await _checkOnlineStatus();
+    if (!isOnline) return;
+
     final method = _returnMethod;
     if (method == null) return;
     final isPickup = method == 'pickup';

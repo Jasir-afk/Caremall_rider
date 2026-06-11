@@ -108,12 +108,7 @@ class _KycVerificationScreenState extends State<KycVerificationScreen> {
                       AppButton(
                         borderRadius: 30,
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DrivingLicenseScreen(),
-                            ),
-                          );
+                          Get.to(() => const DrivingLicenseScreen());
                         },
                         child: AppText(
                           text: isRejected

@@ -4,6 +4,7 @@ import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/src/modules/home_screen/controller/home_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:care_mall_rider/src/modules/home_screen/view/delivered_today_screen.dart';
@@ -45,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentPage = 1;
   int _pageSize = 10;
   bool _hasMoreOrders = true;
+  bool _hasMoreReturns = true;
   bool _loadingMore = false;
   // Client-side visible count per tab (10 per page)
   static const int _pageLimit = 10;
@@ -127,10 +129,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadUserData() async {
     final name = await StorageService.getUserName();
     final avatar = await StorageService.getUserAvatar();
+    final savedOnlineStatus = await StorageService.getOnlineStatus();
     if (mounted) {
       setState(() {
         if (name != null && name.isNotEmpty) _userName = name;
         _userAvatar = avatar;
+        // Load saved online status, default to true if not set
+        _isOnline = savedOnlineStatus ?? true;
       });
     }
   }
@@ -146,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _returnsError = null;
         _currentPage = 1;
         _hasMoreOrders = true;
+        _hasMoreReturns = true;
       });
     }
     // Fetch delivery orders, return orders and dashboard stats in parallel
@@ -153,11 +159,21 @@ class _HomeScreenState extends State<HomeScreen> {
       OrderRepo.getDeliveryOrders(page: _currentPage, limit: _pageSize)
           .then((orders) {
             if (mounted) {
+              // Check for new orders and notify rider using HomeController (only on initial fetch, not loadMore)
+              if (!loadMore && Get.isRegistered<HomeController>()) {
+                final controller = Get.find<HomeController>();
+                controller.checkForNewOrders(
+                  orders,
+                  existingOrders: _allOrders,
+                );
+              }
+
               setState(() {
                 if (loadMore) {
                   _allOrders.addAll(orders);
                 } else {
                   _allOrders = orders;
+                  _allOrdersForCounts = orders; // Use same orders for counts
                 }
                 _hasMoreOrders = orders.length >= _pageSize;
               });
@@ -166,49 +182,24 @@ class _HomeScreenState extends State<HomeScreen> {
           .catchError((e) {
             if (mounted) setState(() => _ordersError = e.toString());
           }),
-      OrderRepo.getDeliveryOrders(page: 1, limit: 100)
-          .then((orders) {
-            if (mounted) {
-              setState(() {
-                _allOrdersForCounts = orders;
-              });
-            }
-          })
-          .catchError((e) {
-            debugPrint('Error fetching all orders for counts: $e');
-            if (mounted && _allOrdersForCounts.isEmpty) {
-              setState(() {
-                _allOrdersForCounts = _allOrders;
-              });
-            }
-          }),
       ReturnRepo.getReturnOrders(
-            page: 1,
-            limit: 50, // Increased limit to fetch more orders
+            page: _currentPage,
+            limit: _pageSize, // Use pagination for return orders
           )
-          .then((returns) async {
+          .then((returns) {
             debugPrint('=== RETURN ORDERS FETCH START ===');
             debugPrint('Fetched ${returns.length} return orders');
-            // Fetch details for ALL return orders to get returnItemStatus
-            for (int i = 0; i < returns.length; i++) {
-              try {
-                final r = returns[i];
-                debugPrint(
-                  'Fetching detail for ${r.returnId} (id: ${r.id}) (current returnItemStatus: ${r.returnItemStatus})...',
-                );
-                final detail = await ReturnRepo.getReturnDetail(r.id);
-                debugPrint(
-                  'Detail for ${r.returnId}: orderStatus=${detail.orderStatus}, returnItemStatus=${detail.returnItemStatus}, isDropped=${detail.isDropped}',
-                );
-                returns[i] = detail;
-                debugPrint('Updated order at index $i');
-              } catch (e) {
-                debugPrint('Failed to fetch detail for order at index $i: $e');
-              }
-            }
-            debugPrint('Final return orders count: ${returns.length}');
             debugPrint('=== RETURN ORDERS FETCH END ===');
-            if (mounted) setState(() => _returnOrders = returns);
+            if (mounted) {
+              setState(() {
+                if (loadMore) {
+                  _returnOrders.addAll(returns);
+                } else {
+                  _returnOrders = returns;
+                }
+                _hasMoreReturns = returns.length >= _pageSize;
+              });
+            }
           })
           .catchError((e) {
             if (mounted) setState(() => _returnsError = e.toString());
@@ -453,181 +444,296 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
-      body: _selectedIndex == 3
-          ? const ProfileScreen()
-          : _selectedIndex == 2
-          ? const WalletScreen()
-          : SafeArea(
-              child: Column(
-                children: [
-                  // ─── Header ──────────────────────────────────────────────────────
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 16.w,
-                      vertical: 16.h,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: AppText(
-                            text: 'Hello, $_userName',
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textnaturalcolor,
-                          ),
-                        ),
-                        // Online/Offline Toggle
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 4.w,
-                            vertical: 4.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(30.r),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Transform.scale(
-                                scale: 0.8,
-                                child: Switch(
-                                  value: _isOnline,
-                                  onChanged: (val) async {
-                                    setState(() => _isOnline = val);
-                                    // Call the controller method to sync with API
-                                    if (Get.isRegistered<HomeController>()) {
-                                      final controller =
-                                          Get.find<HomeController>();
-                                      await controller.toggleOnlineStatus(val);
-                                    }
-                                  },
-                                  activeThumbColor: AppColors.primarycolor,
-                                  activeTrackColor: AppColors.primarycolor
-                                      .withValues(alpha: 0.2),
-                                  inactiveThumbColor: Colors.grey,
-                                  inactiveTrackColor: Colors.grey[200],
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                              ),
-                              SizedBox(width: 4.w),
-                              AppText(
-                                text: _isOnline ? 'Online' : 'Offline',
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w600,
-                                color: _isOnline
-                                    ? AppColors.textnaturalcolor
-                                    : Colors.grey,
-                              ),
-                              SizedBox(width: 8.w),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+  Future<bool> _onWillPop() async {
+    if (_isOnline) {
+      final result = await Get.dialog<bool>(
+        Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(24.w),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                    size: 32.sp,
+                  ),
+                ),
+                SizedBox(height: 20.h),
+                AppText(
+                  text: 'Go Offline?',
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textnaturalcolor,
+                ),
+                SizedBox(height: 12.h),
+                AppText(
+                  text:
+                      'You are currently online. Do you want to go offline before closing the app?',
+                  fontSize: 14.sp,
+                  color: Colors.grey.shade600,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.back(result: false),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          side: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        child: AppText(
+                          text: 'Cancel',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textnaturalcolor,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          setState(() => _isOnline = false);
+                          if (Get.isRegistered<HomeController>()) {
+                            final controller = Get.find<HomeController>();
+                            await controller.toggleOnlineStatus(false);
+                          }
+                          Get.back(result: true);
+                          // Close the app
+                          SystemNavigator.pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primarycolor,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: AppText(
+                          text: 'Go Offline',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+      return result ?? false;
+    }
+    return true;
+  }
 
-                  if (_selectedIndex == 0) ...[
-                    _buildDashboard(),
-                    SizedBox(height: 16.h),
-
-                    Container(
-                      height: 45.h,
-                      margin: EdgeInsets.symmetric(horizontal: 16.w),
-                      padding: EdgeInsets.all(4.w),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8.r),
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF9F9F9),
+        body: _selectedIndex == 3
+            ? const ProfileScreen()
+            : _selectedIndex == 2
+            ? const WalletScreen()
+            : SafeArea(
+                child: Column(
+                  children: [
+                    // ─── Header ──────────────────────────────────────────────────────
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16.w,
+                        vertical: 16.h,
                       ),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildTab('New', _newOrdersForCount.length, 0),
-                          _buildTab(
-                            'In Transit',
-                            _inTransitOrdersForCount.length,
-                            1,
+                          Expanded(
+                            child: AppText(
+                              text: 'Hello, $_userName',
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textnaturalcolor,
+                            ),
                           ),
-                          _buildTab('Returns', _activeReturnOrders.length, 2),
-                          _buildTab(
-                            'History',
-                            _historyOrdersForCount.length +
-                                _historyReturnOrders.length,
-                            3,
+                          // Online/Offline Toggle
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 4.w,
+                              vertical: 4.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(30.r),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Transform.scale(
+                                  scale: 0.8,
+                                  child: Switch(
+                                    value: _isOnline,
+                                    onChanged: (val) async {
+                                      setState(() => _isOnline = val);
+                                      // Call the controller method to sync with API
+                                      if (Get.isRegistered<HomeController>()) {
+                                        final controller =
+                                            Get.find<HomeController>();
+                                        await controller.toggleOnlineStatus(
+                                          val,
+                                        );
+                                      }
+                                    },
+                                    activeThumbColor: AppColors.primarycolor,
+                                    activeTrackColor: AppColors.primarycolor
+                                        .withValues(alpha: 0.2),
+                                    inactiveThumbColor: Colors.grey,
+                                    inactiveTrackColor: Colors.grey[200],
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                                SizedBox(width: 4.w),
+                                AppText(
+                                  text: _isOnline ? 'Online' : 'Offline',
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: _isOnline
+                                      ? AppColors.textnaturalcolor
+                                      : Colors.grey,
+                                ),
+                                SizedBox(width: 8.w),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: 16.h),
 
-                    // ─── Search Bar ──────────────────────────────────────────────────
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w),
-                      child: Container(
+                    if (_selectedIndex == 0) ...[
+                      _buildDashboard(),
+                      SizedBox(height: 16.h),
+
+                      Container(
+                        height: 45.h,
+                        margin: EdgeInsets.symmetric(horizontal: 16.w),
+                        padding: EdgeInsets.all(4.w),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12.r),
-                          border: Border.all(color: Colors.grey[200]!),
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8.r),
                         ),
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (value) {
-                            setState(() => _searchQuery = value);
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Search by customer phone',
-                            hintStyle: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 14.sp,
+                        child: Row(
+                          children: [
+                            _buildTab('New', _newOrdersForCount.length, 0),
+                            _buildTab(
+                              'In Transit',
+                              _inTransitOrdersForCount.length,
+                              1,
                             ),
-                            prefixIcon: Icon(
-                              Icons.search,
-                              color: Colors.grey[400],
+                            _buildTab('Returns', _activeReturnOrders.length, 2),
+                            _buildTab(
+                              'History',
+                              _historyOrdersForCount.length +
+                                  _historyReturnOrders.length,
+                              3,
                             ),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: Icon(
-                                      Icons.clear,
-                                      color: Colors.grey[400],
-                                    ),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() => _searchQuery = '');
-                                    },
-                                  )
-                                : null,
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16.w,
-                              vertical: 12.h,
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+
+                      // ─── Search Bar ──────────────────────────────────────────────────
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (value) {
+                              setState(() => _searchQuery = value);
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Search by customer phone',
+                              hintStyle: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14.sp,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                color: Colors.grey[400],
+                              ),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(
+                                        Icons.clear,
+                                        color: Colors.grey[400],
+                                      ),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _searchQuery = '');
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16.w,
+                                vertical: 12.h,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 16.h),
+                      SizedBox(height: 16.h),
 
-                    // ─── Order / Return List ──────────────────────────────────────────
-                    Expanded(
-                      child: _selectedTab == 3
-                          ? _buildHistoryList()
-                          : (_isReturnTab
-                                ? _buildReturnList()
-                                : _buildDeliveryList()),
-                    ),
-                  ] else if (_selectedIndex == 1) ...[
-                    const Expanded(child: RouteScreen()),
+                      // ─── Order / Return List ──────────────────────────────────────────
+                      Expanded(
+                        child: _selectedTab == 3
+                            ? _buildHistoryList()
+                            : (_isReturnTab
+                                  ? _buildReturnList()
+                                  : _buildDeliveryList()),
+                      ),
+                    ] else if (_selectedIndex == 1) ...[
+                      const Expanded(child: RouteScreen()),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
 
-      bottomNavigationBar: _buildCustomBottomNav(),
+        bottomNavigationBar: _buildCustomBottomNav(),
+      ),
     );
   }
 
@@ -1147,7 +1253,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final activeReturns = allReturns.take(_visibleReturnCount).toList();
     final bool showLoadMore =
         activeReturns.length < allReturns.length ||
-        (_hasMoreOrders && allReturns.length >= _pageSize);
+        (_hasMoreReturns && allReturns.length >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
       child: ListView.separated(

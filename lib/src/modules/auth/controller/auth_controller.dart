@@ -54,10 +54,12 @@ class AuthController extends GetxController {
   /// - [phone]: 10-digit phone number
   /// - [onSuccess]: Callback function when OTP is sent successfully
   /// - [onError]: Callback function when there's an error
+  /// - [onAccountDeleted]: Callback function when account is deleted
   Future<void> sendLoginOtp({
     required String phone,
     Function? onSuccess,
     Function(String)? onError,
+    Function(String)? onAccountDeleted,
   }) async {
     isLoading.value = true;
 
@@ -69,8 +71,19 @@ class AuthController extends GetxController {
         AppSnackbar.showSuccess(title: 'Success', message: result['message']);
         if (onSuccess != null) onSuccess();
       } else {
-        AppSnackbar.showError(title: 'Error', message: result['message']);
-        if (onError != null) onError(result['message']);
+        // Check for account_deleted status
+        if (result['status'] == 'account_deleted') {
+          AppSnackbar.showError(
+            title: 'Account Deleted',
+            message:
+                result['message'] ??
+                'Your account has been deleted. Please create a new account to continue.',
+          );
+          if (onAccountDeleted != null) onAccountDeleted(result['message']);
+        } else {
+          AppSnackbar.showError(title: 'Error', message: result['message']);
+          if (onError != null) onError(result['message']);
+        }
       }
     } catch (e) {
       AppSnackbar.showError(

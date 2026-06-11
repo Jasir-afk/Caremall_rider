@@ -40,6 +40,7 @@ class HomeController extends GetxController {
   final currentPage = 1.obs;
   final pageSize = 10;
   final hasMoreOrders = true.obs;
+  final hasMoreReturns = true.obs;
   final loadingMore = false.obs;
 
   // Client-side visible count per tab
@@ -204,17 +205,15 @@ class HomeController extends GetxController {
       returnsError.value = null;
       currentPage.value = 1;
       hasMoreOrders.value = true;
+      hasMoreReturns.value = true;
     }
 
-    // Fetch data in parallel - return orders moved to end as it's now parallelized
+    // Fetch data in parallel
     await Future.wait([
       _fetchDeliveryOrders(loadMore),
-      _fetchAllOrdersForCounts(),
       _fetchDashboardStats(),
+      _fetchReturnOrders(loadMore),
     ]);
-
-    // Fetch return orders separately to avoid blocking other data
-    await _fetchReturnOrders();
 
     ordersLoading.value = false;
     returnsLoading.value = false;
@@ -230,6 +229,12 @@ class HomeController extends GetxController {
         page: currentPage.value,
         limit: pageSize,
       );
+
+      // Check for new orders and notify rider
+      if (!loadMore) {
+        await checkForNewOrders(orders);
+      }
+
       if (loadMore) {
         allOrders.addAll(orders);
       } else {
@@ -241,37 +246,150 @@ class HomeController extends GetxController {
     }
   }
 
-  Future<void> _fetchAllOrdersForCounts() async {
-    try {
-      // Reduced from 1000 to 100 - sufficient for counts and much faster
-      final orders = await OrderRepo.getDeliveryOrders(page: 1, limit: 100);
-      allOrdersForCounts.assignAll(orders);
-    } catch (e) {
-      debugPrint('Error fetching all orders for counts: $e');
-      if (allOrdersForCounts.isEmpty) {
-        allOrdersForCounts.assignAll(allOrders);
-      }
+  /// Check for newly assigned orders and show notification
+  Future<void> checkForNewOrders(
+    List<DeliveryOrder> newOrders, {
+    List<DeliveryOrder>? existingOrders,
+  }) async {
+    // Get existing order IDs from storage (not from current state)
+    final lastKnownOrderIds = await StorageService.getLastKnownOrderIds();
+    final existingOrderIdsSet = lastKnownOrderIds.toSet();
+
+    // Find orders that are in "New" status and weren't in the previous list
+    final newlyAssignedOrders = newOrders.where((order) {
+      final status = order.orderStatus.toLowerCase();
+      final isNewOrder = newStatuses.contains(status);
+      final isPreviouslyUnknown = !existingOrderIdsSet.contains(order.id);
+      return isNewOrder && isPreviouslyUnknown;
+    }).toList();
+
+    // Show notification if there are new orders
+    if (newlyAssignedOrders.isNotEmpty) {
+      final count = newlyAssignedOrders.length;
+      Get.bottomSheet(
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF10B981), Color(0xFF059669)],
+            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle bar
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  // Icon with animation
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.local_shipping_rounded,
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Title
+                  Text(
+                    'New Order${count > 1 ? 's' : ''} Assigned!',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  // Message
+                  Text(
+                    count == 1
+                        ? 'You have a new delivery order:\n${newlyAssignedOrders.first.orderId}'
+                        : 'You have $count new delivery orders\nready for delivery',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  // Action button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Get.back(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF10B981),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Got It',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+        ),
+        isDismissible: true,
+        enableDrag: true,
+        backgroundColor: Colors.transparent,
+      );
+
+      // Save updated order IDs to storage after showing notification
+      final allCurrentOrderIds = newOrders.map((o) => o.id).toList();
+      await StorageService.saveLastKnownOrderIds(allCurrentOrderIds);
+    } else {
+      // Even if no new orders, update storage with current order IDs
+      // to keep the stored list in sync
+      final allCurrentOrderIds = newOrders.map((o) => o.id).toList();
+      await StorageService.saveLastKnownOrderIds(allCurrentOrderIds);
     }
   }
 
-  Future<void> _fetchReturnOrders() async {
+  Future<void> _fetchReturnOrders(bool loadMore) async {
     try {
-      // Fetch with a higher limit to get all orders including old ones
       final returns = await ReturnRepo.getReturnOrders(
-        page: 1,
-        limit: 100, // Increased limit to fetch more orders
+        page: currentPage.value,
+        limit: pageSize,
       );
-      // Fetch details for all return orders in parallel instead of sequentially
-      final detailFutures = returns.map((r) async {
-        try {
-          return await ReturnRepo.getReturnDetail(r.id);
-        } catch (e) {
-          debugPrint('Failed to fetch detail for order ${r.id}: $e');
-          return r; // Return original if detail fetch fails
-        }
-      }).toList();
-      final detailedReturns = await Future.wait(detailFutures);
-      returnOrders.assignAll(detailedReturns);
+      if (loadMore) {
+        returnOrders.addAll(returns);
+      } else {
+        returnOrders.assignAll(returns);
+      }
+      hasMoreReturns.value = returns.length >= pageSize;
     } catch (e) {
       returnsError.value = e.toString();
     }
@@ -432,8 +550,9 @@ class HomeController extends GetxController {
   List<DeliveryOrder> get todayCodOrders {
     final now = DateTime.now();
     return baseOrders.where((o) {
-      if (o.orderStatus.toLowerCase() != 'delivered' || o.deliveredAt == null)
+      if (o.orderStatus.toLowerCase() != 'delivered' || o.deliveredAt == null) {
         return false;
+      }
       final d = o.deliveredAt!;
       return d.year == now.year &&
           d.month == now.month &&

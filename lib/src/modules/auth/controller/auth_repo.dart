@@ -41,12 +41,15 @@ class AuthRepo {
           'data': responseData,
         };
       } else {
+        // Check for account_deleted status
+        final status = responseData['status'];
         return {
           'success': false,
           'message':
               responseData['message'] ??
               'Failed to send OTP. Please try again.',
           'data': responseData,
+          'status': status, // Include status field for account_deleted handling
         };
       }
     } catch (e) {

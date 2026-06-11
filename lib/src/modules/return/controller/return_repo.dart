@@ -90,4 +90,14 @@ class ReturnRepo {
       replacementPickupStatus: replacementPickupStatus,
     );
   }
+
+  /// Fetch original order price for replacement orders
+  static Future<double> getOriginalOrderPrice(String orderId) async {
+    try {
+      final order = await OrderRepo.getOrderDetail(orderId);
+      return order.totalAmount;
+    } catch (e) {
+      throw Exception('Failed to fetch original order price: $e');
+    }
+  }
 }

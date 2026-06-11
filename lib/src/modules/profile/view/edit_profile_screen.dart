@@ -319,6 +319,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
                   ),
+                  SizedBox(height: 24.h),
+                  _buildDeleteAccountButton(),
+                  SizedBox(height: 40.h),
                 ]),
               ),
             ),
@@ -758,6 +761,174 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
     );
+  }
+
+  // ── Delete Account Button ─────────────────────────────────────────────────────
+
+  Widget _buildDeleteAccountButton() {
+    return GestureDetector(
+      onTap: _loading ? null : _showDeleteConfirmation,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 56.h,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.red.shade50, Colors.red.shade100],
+          ),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: Colors.red.shade200, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.red.shade100.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.all(8.r),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.warning_rounded,
+                  color: Colors.red.shade700,
+                  size: 18.sp,
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppText(
+                    text: 'Delete Account',
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.red.shade800,
+                  ),
+                  SizedBox(height: 2.h),
+                  AppText(
+                    text: 'This action cannot be undone',
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red.shade600,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.warning_rounded, color: Colors.red[600], size: 24.sp),
+            SizedBox(width: 12.w),
+            AppText(
+              text: 'Delete Account',
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textnaturalcolor,
+            ),
+          ],
+        ),
+        content: AppText(
+          text:
+              'Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently removed.',
+          fontSize: 14.sp,
+          color: AppColors.textDefaultSecondarycolor,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: AppText(
+              text: 'Cancel',
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600] ?? Colors.grey,
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteAccount();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[600],
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+            ),
+            child: AppText(
+              text: 'Delete',
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    setState(() => _loading = true);
+    try {
+      final result = await ProfileRepo.deleteAccount();
+
+      if (result['success'] == true) {
+        // Clear all locally stored authentication data
+        await StorageService.clearAuthData();
+
+        // Show success message
+        if (mounted) {
+          AppSnackbar.showSuccess(
+            title: 'Account Deleted',
+            message:
+                result['message'] ??
+                'Your account has been deleted successfully.',
+          );
+
+          // Redirect to login/signup screen
+          Get.offAllNamed('/login');
+        }
+      } else {
+        if (mounted) {
+          AppSnackbar.showError(
+            title: 'Deletion Failed',
+            message: result['message'] ?? 'Failed to delete account.',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.showError(
+          title: 'Error',
+          message: 'Failed to delete account: $e',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 }
 

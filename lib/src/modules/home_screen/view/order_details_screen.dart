@@ -3,6 +3,8 @@ import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
+import 'package:care_mall_rider/src/modules/home_screen/controller/home_controller.dart';
 import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/delivery_order_model.dart';
 import 'package:flutter/material.dart';
@@ -36,6 +38,113 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   void initState() {
     super.initState();
     _fetchDetail();
+  }
+
+  /// Check if rider is online, if not show dialog to go online
+  /// Returns true if rider is online or went online, false if cancelled
+  Future<bool> _checkOnlineStatus() async {
+    // Check from storage first
+    final savedStatus = await StorageService.getOnlineStatus();
+    final isOnline = savedStatus ?? true;
+
+    if (!isOnline) {
+      final result = await Get.dialog<bool>(
+        Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(24.w),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                    size: 32.sp,
+                  ),
+                ),
+                SizedBox(height: 20.h),
+                AppText(
+                  text: 'Go Online?',
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textnaturalcolor,
+                ),
+                SizedBox(height: 12.h),
+                AppText(
+                  text:
+                      'You are currently offline. You need to go online to perform this action.',
+                  fontSize: 14.sp,
+                  color: Colors.grey.shade600,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.back(result: false),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          side: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        child: AppText(
+                          text: 'Cancel',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textnaturalcolor,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          // Go online
+                          if (Get.isRegistered<HomeController>()) {
+                            final controller = Get.find<HomeController>();
+                            await controller.toggleOnlineStatus(true);
+                          }
+                          Get.back(result: true);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primarycolor,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: AppText(
+                          text: 'Go Online',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+      return result ?? false;
+    }
+    return true;
   }
 
   Future<void> _fetchDetail() async {
@@ -231,6 +340,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _markWarehouseDrop() async {
+    // Check if rider is online
+    final isOnline = await _checkOnlineStatus();
+    if (!isOnline) return;
+
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
         backgroundColor: Colors.white,
@@ -287,6 +400,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _deliverOrder() async {
+    // Check if rider is online
+    final isOnline = await _checkOnlineStatus();
+    if (!isOnline) return;
+
     // If it's a COD order, ensure payment collected is checked
     final bool isCod = _display.isCod;
     if (isCod && !_paymentCollected) {
@@ -358,6 +475,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _pickUpOrder() async {
+    // Check if rider is online
+    final isOnline = await _checkOnlineStatus();
+    if (!isOnline) return;
+
     final source = _display.isFromWarehouse ? 'warehouse' : 'delivery hub';
     final confirmed = await Get.dialog<bool>(
       AlertDialog(

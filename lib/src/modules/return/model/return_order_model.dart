@@ -1,8 +1,10 @@
 import 'package:care_mall_rider/src/modules/home_screen/model/delivery_order_model.dart';
+import 'package:flutter/foundation.dart';
 
 class ReturnOrder {
   final String id;
   final String returnId;
+  final String? orderId;
   final String orderStatus;
   final String? reason;
   final double totalAmount;
@@ -28,6 +30,7 @@ class ReturnOrder {
   ReturnOrder({
     required this.id,
     required this.returnId,
+    this.orderId,
     required this.orderStatus,
     this.reason,
     required this.totalAmount,
@@ -111,15 +114,32 @@ class ReturnOrder {
         tryDouble(json['replacementAmount']) ??
         tryDouble(json['orderAmount']) ??
         tryDouble(json['itemAmount']) ??
+        tryDouble(json['finalAmount']) ??
+        tryDouble(json['grandTotal']) ??
+        tryDouble(json['price']) ??
+        tryDouble(json['originalAmount']) ??
+        tryDouble(json['replacementItemPrice']) ??
         // 2. Nested order object
         (orderObj is Map
             ? (tryDouble(orderObj['totalAmount']) ??
                   tryDouble(orderObj['amount']) ??
                   tryDouble(orderObj['subTotal']) ??
                   tryDouble(orderObj['subtotal']) ??
-                  tryDouble(orderObj['orderTotal']))
+                  tryDouble(orderObj['orderTotal']) ??
+                  tryDouble(orderObj['finalAmount']) ??
+                  tryDouble(orderObj['grandTotal']) ??
+                  tryDouble(orderObj['price']) ??
+                  tryDouble(orderObj['originalAmount']))
             : null) ??
-        // 3. Sum items array if present
+        // 3. Check item object (for replacement orders)
+        (json['item'] is Map
+            ? (tryDouble(json['item']['priceAtOrder']) ??
+                  tryDouble(json['item']['price']) ??
+                  tryDouble(json['item']['amount']) ??
+                  tryDouble(json['item']['totalPrice']) ??
+                  tryDouble(json['item']['sellingPrice']))
+            : null) ??
+        // 4. Sum items array if present
         (() {
           final items =
               json['items'] ?? (orderObj is Map ? orderObj['items'] : null);
@@ -132,6 +152,9 @@ class ReturnOrder {
                       (item['price'] ??
                               item['amount'] ??
                               item['totalPrice'] ??
+                              item['finalPrice'] ??
+                              item['originalPrice'] ??
+                              item['priceAtOrder'] ??
                               0)
                           .toString(),
                     ) ??
@@ -148,8 +171,24 @@ class ReturnOrder {
           }
           return null;
         })() ??
-        // 4. Last resort: refundAmount (for refund orders; 0 for replacements)
+        // 5. Last resort: refundAmount (for refund orders; 0 for replacements)
         parsedRefundAmount;
+
+    // Debug: Log if totalAmount is 0 for replacement orders
+    if (parsedTotalAmount == 0 &&
+        (json['returnType']?.toString().toLowerCase() == 'replacement' ||
+            json['requestType']?.toString().toLowerCase() == 'replacement')) {
+      debugPrint('⚠️ Replacement order with 0 price detected');
+      debugPrint('Return ID: ${json['returnId'] ?? json['_id']}');
+      debugPrint(
+        'Available amount fields: ${json.keys.where((k) => k.toLowerCase().contains('amount') || k.toLowerCase().contains('price') || k.toLowerCase().contains('total')).toList()}',
+      );
+      if (orderObj is Map) {
+        debugPrint(
+          'Order object amount fields: ${orderObj.keys.where((k) => k.toLowerCase().contains('amount') || k.toLowerCase().contains('price') || k.toLowerCase().contains('total')).toList()}',
+        );
+      }
+    }
 
     final rawReturnItemStatus = json['returnItemStatus']?.toString();
     final returnItemStatus =
@@ -177,6 +216,9 @@ class ReturnOrder {
     return ReturnOrder(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       returnId: (json['returnId'] ?? json['_id'] ?? '').toString(),
+      orderId:
+          (json['orderId'] ?? (orderObj is Map ? orderObj['orderId'] : null))
+              ?.toString(),
       orderStatus: (json['status'] ?? json['orderStatus'] ?? 'pending')
           .toString()
           .toLowerCase(),
@@ -225,13 +267,15 @@ class ReturnOrder {
     String? refundStatus,
     DispatchInfo? dispatch,
     String? deliveryHub,
+    double? totalAmount,
   }) {
     return ReturnOrder(
       id: id,
       returnId: returnId,
+      orderId: orderId ?? this.orderId,
       orderStatus: orderStatus ?? this.orderStatus,
       reason: reason,
-      totalAmount: totalAmount,
+      totalAmount: totalAmount ?? this.totalAmount,
       customerName: customerName,
       customerPhone: customerPhone,
       address: address,
@@ -258,6 +302,7 @@ class ReturnOrder {
     return ReturnOrder(
       id: order.id,
       returnId: order.orderId,
+      orderId: order.orderId,
       orderStatus: order.orderStatus,
       totalAmount: order.totalAmount,
       customerName: order.shippingAddress.fullName,

@@ -4,17 +4,15 @@ import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/app/utils/spaces.dart';
+import 'package:care_mall_rider/core/routes/app_routes.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
 import 'package:care_mall_rider/src/modules/auth/controller/auth_controller.dart';
-import 'package:care_mall_rider/src/modules/kyc/view/kyc_verification_screen.dart';
 import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-
-import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -93,9 +91,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         // Check KYC status before navigating
         await KycRepo.getKycStatus();
         final bool isKycDone = await StorageService.isKycCompleted();
-        Get.offAll(
-          () => isKycDone ? const HomeScreen() : const KycVerificationScreen(),
-        );
+        Get.offAllNamed(isKycDone ? AppRoutes.home : AppRoutes.kyc);
       },
     );
   }
