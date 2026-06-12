@@ -165,7 +165,7 @@ class LoginScreen extends GetView<AuthController> {
                             TextButton(
                               onPressed: () => Get.to(() => RegisterScreen()),
                               child: Text(
-                                'Create New Account',
+                                'SignUp',
                                 style: TextStyle(
                                   color: Colors.red,
                                   fontSize: 15.sp,

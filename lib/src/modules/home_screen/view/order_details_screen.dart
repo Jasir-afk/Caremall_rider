@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:ui' as ui;
+import 'dart:ui';
 import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
@@ -34,6 +36,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   bool _photoUploaded =
       false; // Tracks if photo was uploaded in current session
   bool _updatingStatus = false;
+  File? _uploadedPhotoFile; // Stores the uploaded photo file for preview
 
   void initState() {
     super.initState();
@@ -244,7 +247,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     setState(() => _uploading = false);
 
     if (result['success'] == true) {
-      setState(() => _photoUploaded = true);
+      setState(() {
+        _photoUploaded = true;
+        _uploadedPhotoFile = File(picked.path);
+      });
       AppSnackbar.showSuccess(
         title: 'Success',
         message: 'Photo uploaded successfully! You can now deliver.',
@@ -255,6 +261,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         message: result['message'] ?? 'Upload failed. Try again.',
       );
     }
+  }
+
+  void _removePhoto() {
+    setState(() {
+      _uploadedPhotoFile = null;
+      _photoUploaded = false;
+    });
   }
 
   Future<void> _markUndelivered() async {
@@ -1183,108 +1196,298 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (!isAlreadyUndelivered) ...[
-            Expanded(
-              child: AppButton(
-                onPressed: _updatingStatus ? null : _markUndelivered,
-                btncolor: Colors.white,
-                borderRadius: 8.r,
-                buttonStyle: ButtonStyle(
-                  backgroundColor: WidgetStateProperty.all(Colors.white),
-                  side: WidgetStateProperty.all(
-                    const BorderSide(color: AppColors.errorMain),
-                  ),
-                  shape: WidgetStateProperty.all(
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                  ),
-                  elevation: WidgetStateProperty.all(0),
-                ),
-                child: AppText(
-                  text: 'Undelivered',
-                  color: AppColors.errorMain,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w600,
-                ),
+          // Photo preview when uploaded
+          if (_uploadedPhotoFile != null) ...[
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: const Color(0xFFFECACA)),
               ),
-            ),
-            SizedBox(width: 12.w),
-          ],
-          if (isWarehouseDropPending) ...[
-            Expanded(
-              child: AppButton(
-                onPressed: _updatingStatus ? null : _markWarehouseDrop,
-                btncolor: AppColors.primarycolor,
-                borderRadius: 8.r,
-                child: AppText(
-                  text: 'Drop at Warehouse',
-                  color: Colors.white,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            SizedBox(width: 12.w),
-          ],
-          if (!isAlreadyUndelivered)
-            Expanded(
-              child: AppButton(
-                onPressed: _uploading || _updatingStatus
-                    ? null
-                    : (_photoUploaded
-                          ? (_display.isCod && !_paymentCollected
-                                ? null
-                                : _deliverOrder)
-                          : _uploadPhoto),
-                btncolor: AppColors.primarycolor,
-                borderRadius: 8.r,
-                buttonStyle: ButtonStyle(
-                  backgroundColor: WidgetStateProperty.all(
-                    (_photoUploaded && _display.isCod && !_paymentCollected)
-                        ? Colors.grey
-                        : AppColors.primarycolor,
-                  ),
-                  shape: WidgetStateProperty.all(
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                  ),
-                ),
-                child: (_uploading || _updatingStatus)
-                    ? SizedBox(
-                        width: 20.w,
-                        height: 20.w,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Get.dialog(
+                        Dialog(
+                          backgroundColor: const ui.Color.fromARGB(
+                            255,
+                            255,
+                            255,
+                            255,
+                          ),
+                          insetPadding: EdgeInsets.zero,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // Backdrop with blur
+                              BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: 10,
+                                  sigmaY: 10,
+                                ),
+                                child: Container(
+                                  color: Colors.black.withValues(alpha: 0.85),
+                                ),
+                              ),
+                              // Image viewer
+                              Center(
+                                child: InteractiveViewer(
+                                  minScale: 0.5,
+                                  maxScale: 4.0,
+                                  child: Hero(
+                                    tag: 'delivery_photo_${widget.order.id}',
+                                    child: Image.file(
+                                      _uploadedPhotoFile!,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Top bar with close button
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                child: SafeArea(
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 20.w,
+                                      vertical: 16.h,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // Zoom indicator
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 12.w,
+                                            vertical: 6.h,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.15,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20.r,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.2,
+                                              ),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.zoom_out_map,
+                                                color: Colors.white,
+                                                size: 20.sp,
+                                              ),
+                                              // SizedBox(width: 6.w),
+                                              // AppText(
+                                              //   text: 'Pinch to zoom',
+                                              //   fontSize: 12.sp,
+                                              //   fontWeight: FontWeight.w500,
+                                              //   color: Colors.white,
+                                              // ),
+                                            ],
+                                          ),
+                                        ),
+                                        // Close button
+                                        GestureDetector(
+                                          onTap: () => Get.back(),
+                                          child: Container(
+                                            padding: EdgeInsets.all(10.w),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.white.withValues(
+                                                  alpha: 0.3,
+                                                ),
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              Icons.close_rounded,
+                                              color: Colors.white,
+                                              size: 24.sp,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _photoUploaded
-                                ? Icons.check_circle_outline
-                                : Icons.camera_alt_outlined,
-                            size: 16.sp,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 6.w),
-                          AppText(
-                            text: _photoUploaded
-                                ? 'Deliver Order'
-                                : 'Upload Photo',
-                            color: Colors.white,
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ],
+                        barrierDismissible: true,
+                      );
+                    },
+                    child: Hero(
+                      tag: 'delivery_photo_${widget.order.id}',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8.r),
+                        child: Image.file(
+                          _uploadedPhotoFile!,
+                          width: 60.w,
+                          height: 60.w,
+                          fit: BoxFit.cover,
+                        ),
                       ),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText(
+                          text: 'Photo Uploaded',
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFDC2626),
+                        ),
+                        SizedBox(height: 4.h),
+                        AppText(
+                          text: 'Tap to remove and re-upload',
+                          fontSize: 11.sp,
+                          color: Colors.grey.shade600,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _removePhoto,
+                    icon: Icon(
+                      Icons.close,
+                      color: Colors.red.shade400,
+                      size: 20.sp,
+                    ),
+                    padding: EdgeInsets.all(8.w),
+                  ),
+                ],
               ),
             ),
+            SizedBox(height: 12.h),
+          ],
+          // Action buttons
+          Row(
+            children: [
+              if (!isAlreadyUndelivered) ...[
+                Expanded(
+                  child: AppButton(
+                    onPressed: _updatingStatus ? null : _markUndelivered,
+                    btncolor: Colors.white,
+                    borderRadius: 8.r,
+                    buttonStyle: ButtonStyle(
+                      backgroundColor: WidgetStateProperty.all(Colors.white),
+                      side: WidgetStateProperty.all(
+                        const BorderSide(color: AppColors.errorMain),
+                      ),
+                      shape: WidgetStateProperty.all(
+                        RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                      ),
+                      elevation: WidgetStateProperty.all(0),
+                    ),
+                    child: AppText(
+                      text: 'Undelivered',
+                      color: AppColors.errorMain,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+              ],
+              if (isWarehouseDropPending) ...[
+                Expanded(
+                  child: AppButton(
+                    onPressed: _updatingStatus ? null : _markWarehouseDrop,
+                    btncolor: AppColors.primarycolor,
+                    borderRadius: 8.r,
+                    child: AppText(
+                      text: 'Drop at Warehouse',
+                      color: Colors.white,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+              ],
+              if (!isAlreadyUndelivered)
+                Expanded(
+                  child: AppButton(
+                    onPressed: _uploading || _updatingStatus
+                        ? null
+                        : (_photoUploaded
+                              ? (_display.isCod && !_paymentCollected
+                                    ? null
+                                    : _deliverOrder)
+                              : _uploadPhoto),
+                    btncolor: AppColors.primarycolor,
+                    borderRadius: 8.r,
+                    buttonStyle: ButtonStyle(
+                      backgroundColor: WidgetStateProperty.all(
+                        (_photoUploaded && _display.isCod && !_paymentCollected)
+                            ? Colors.grey
+                            : AppColors.primarycolor,
+                      ),
+                      shape: WidgetStateProperty.all(
+                        RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                      ),
+                    ),
+                    child: (_uploading || _updatingStatus)
+                        ? SizedBox(
+                            width: 20.w,
+                            height: 20.w,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _photoUploaded
+                                    ? Icons.check_circle_outline
+                                    : Icons.camera_alt_outlined,
+                                size: 16.sp,
+                                color: Colors.white,
+                              ),
+                              SizedBox(width: 6.w),
+                              AppText(
+                                text: _photoUploaded
+                                    ? 'Deliver Order'
+                                    : 'Upload Photo',
+                                color: Colors.white,
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
