@@ -1,171 +1,140 @@
 import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/core/services/storage_service.dart';
-
 import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
-import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
+import 'package:care_mall_rider/src/modules/kyc/controller/kyc_controller.dart';
 import 'package:care_mall_rider/src/modules/kyc/view/driving_license_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 
 class KycVerificationScreen extends StatefulWidget {
   const KycVerificationScreen({super.key});
 
-  @override
   State<KycVerificationScreen> createState() => _KycVerificationScreenState();
 }
 
 class _KycVerificationScreenState extends State<KycVerificationScreen> {
-  String _status = 'pending';
-  bool _isInitLoading = true;
+  late final KYCController _kycController;
 
-  @override
   void initState() {
     super.initState();
-    _checkStatus();
-  }
-
-  Future<void> _checkStatus() async {
-    // 1. Get from local storage first (fast)
-    final localStatus = await StorageService.getKycStatus();
-    if (mounted) {
-      setState(() => _status = localStatus);
-      final s = _status.toLowerCase();
-      if (s == 'verified' || s == 'under_review' || s == 'approved') {
-        _navigateHome();
-        return;
-      }
-    }
-
-    // 2. Fetch from API (accurate)
-    final response = await KycRepo.getKycStatus();
-    if (mounted) {
-      setState(() {
-        if (response['success'] == true) {
-          _status = response['status'];
-        }
-        _isInitLoading = false;
-      });
-
-      final s = _status.toLowerCase();
-      if (s == 'verified' || s == 'under_review' || s == 'approved') {
-        _navigateHome();
-      }
-    }
+    _kycController = Get.find<KYCController>();
+    _kycController.fetchKycStatus();
   }
 
   void _navigateHome() {
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-      (route) => false,
-    );
+    Get.offAll(() => const HomeScreen());
   }
 
-  @override
   Widget build(BuildContext context) {
-    final bool isUnderReview = _status == 'under_review';
-    final bool isRejected = _status == 'rejected';
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      body: _isInitLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // ─── Header ───────────────────────────────────────────────
-                _KycHeader(status: _status),
+      body: Obx(() {
+        final bool isUnderReview = _kycController.isKycUnderReview;
+        final bool isRejected = _kycController.isKycRejected;
+        final bool isApproved = _kycController.isKycApproved;
 
-                // ─── Body ─────────────────────────────────────────────────────
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 24,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (isUnderReview) _buildReviewBanner(),
-                        if (isRejected) _buildRejectedBanner(),
+        // Navigate to home if approved
+        if (isApproved) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _navigateHome();
+          });
+        }
 
-                        const SizedBox(height: 8),
-                        AppText(
-                          text: "WHAT YOU'LL NEED",
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textDefaultSecondarycolor,
-                          letterspace: 0.8,
-                        ),
-                        const SizedBox(height: 12),
+        if (_kycController.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-                        // KYC Step Cards
-                        _KycStepCard(
-                          icon: Icons.badge_outlined,
-                          iconBgColor: const Color(0xFFE8F0FE),
-                          iconColor: const Color(0xFF4A6CF7),
-                          title: 'Driving License',
-                          subtitle: 'Upload front & back of your license',
-                        ),
-                        const SizedBox(height: 10),
+        return Column(
+          children: [
+            // ─── Header ───────────────────────────────────────────────
+            _KycHeader(status: _kycController.kycStatus.value),
 
-                        _KycStepCard(
-                          icon: Icons.account_balance_outlined,
-                          iconBgColor: const Color(0xFFE8F5E9),
-                          iconColor: const Color(0xFF2E7D32),
-                          title: 'Bank / UPI Details',
-                          subtitle: 'Add your payout bank or UPI account',
-                        ),
-                        const SizedBox(height: 10),
-
-                        _KycStepCard(
-                          icon: Icons.directions_car_outlined,
-                          iconBgColor: const Color(0xFFFFF8E1),
-                          iconColor: const Color(0xFFFFA621),
-                          title: 'Vehicle Selection',
-                          subtitle: 'Choose the vehicle type for deliveries',
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // ─── Start KYC Button ──────────────────────────────
-                        if (!isUnderReview)
-                          AppButton(
-                            borderRadius: 30,
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const DrivingLicenseScreen(),
-                                ),
-                              );
-                            },
-                            child: AppText(
-                              text: isRejected
-                                  ? 'Re-submit KYC Verification'
-                                  : 'Start KYC Verification',
-                              fontSize: 16.sp,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.whitecolor,
-                            ),
-                          ),
-                        if (isUnderReview)
-                          Center(
-                            child: AppText(
-                              text: 'Submission under process',
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textDefaultSecondarycolor,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+            // ─── Body ─────────────────────────────────────────────────────
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 24,
                 ),
-              ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isUnderReview) _buildReviewBanner(),
+                    if (isRejected) _buildRejectedBanner(),
+
+                    const SizedBox(height: 8),
+                    AppText(
+                      text: "WHAT YOU'LL NEED",
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textDefaultSecondarycolor,
+                      letterspace: 0.8,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // KYC Step Cards
+                    _KycStepCard(
+                      icon: Icons.badge_outlined,
+                      iconBgColor: const Color(0xFFE8F0FE),
+                      iconColor: const Color(0xFF4A6CF7),
+                      title: 'Driving License',
+                      subtitle: 'Upload front & back of your license',
+                    ),
+                    const SizedBox(height: 10),
+
+                    _KycStepCard(
+                      icon: Icons.account_balance_outlined,
+                      iconBgColor: const Color(0xFFE8F5E9),
+                      iconColor: const Color(0xFF2E7D32),
+                      title: 'Bank / UPI Details',
+                      subtitle: 'Add your payout bank or UPI account',
+                    ),
+                    const SizedBox(height: 10),
+
+                    _KycStepCard(
+                      icon: Icons.directions_car_outlined,
+                      iconBgColor: const Color(0xFFFFF8E1),
+                      iconColor: const Color(0xFFFFA621),
+                      title: 'Vehicle Selection',
+                      subtitle: 'Choose the vehicle type for deliveries',
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // ─── Start KYC Button ──────────────────────────────
+                    if (!isUnderReview)
+                      AppButton(
+                        borderRadius: 30,
+                        onPressed: () {
+                          Get.to(() => const DrivingLicenseScreen());
+                        },
+                        child: AppText(
+                          text: isRejected
+                              ? 'Re-submit KYC Verification'
+                              : 'Start KYC Verification',
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.whitecolor,
+                        ),
+                      ),
+                    if (isUnderReview)
+                      Center(
+                        child: AppText(
+                          text: 'Submission under process',
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textDefaultSecondarycolor,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
+          ],
+        );
+      }),
     );
   }
 
@@ -230,7 +199,6 @@ class _KycHeader extends StatelessWidget {
 
   const _KycHeader({required this.status});
 
-  @override
   Widget build(BuildContext context) {
     String headerTitle = 'KYC Verification';
     String headerSubtitle = 'Complete your KYC to start delivering and earning';
@@ -323,7 +291,6 @@ class _KycStepCard extends StatelessWidget {
     required this.subtitle,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,

@@ -2,7 +2,9 @@ import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
+import 'package:care_mall_rider/src/modules/home_screen/controller/home_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:care_mall_rider/src/modules/home_screen/view/delivered_today_screen.dart';
@@ -11,14 +13,14 @@ import 'package:care_mall_rider/src/modules/home_screen/view/route_screen.dart';
 import 'package:care_mall_rider/src/modules/profile/view/profile_screen.dart';
 import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/delivery_order_model.dart';
-import 'package:care_mall_rider/src/modules/home_screen/model/return_order_model.dart';
-import 'package:care_mall_rider/src/modules/home_screen/view/return_details_screen.dart';
+import 'package:care_mall_rider/src/modules/return/controller/return_repo.dart';
+import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
+import 'package:care_mall_rider/src/modules/return/view/return_details_screen.dart';
 import 'package:care_mall_rider/src/modules/wallet/view/wallet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
-  @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
@@ -31,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _userAvatar;
   // ── API state ───────────
   List<DeliveryOrder> _allOrders = [];
+  List<DeliveryOrder> _allOrdersForCounts = [];
   bool _ordersLoading = true;
   String? _ordersError;
   List<ReturnOrder> _returnOrders = [];
@@ -39,44 +42,164 @@ class _HomeScreenState extends State<HomeScreen> {
   // Dashboard stats from API
   double _totalCodToday = 0.0;
   int _totalDeliveredToday = 0;
+  // Pagination state
+  int _currentPage = 1;
+  int _pageSize = 10;
+  bool _hasMoreOrders = true;
+  bool _hasMoreReturns = true;
+  bool _loadingMore = false;
+  // Client-side visible count per tab (10 per page)
+  static const int _pageLimit = 10;
+  int _visibleNewCount = _pageLimit;
+  int _visibleHistoryCount = _pageLimit;
+  int _visibleReturnCount = _pageLimit;
+  // Scroll controllers
+  final ScrollController _deliveryScrollController = ScrollController();
+  final ScrollController _historyScrollController = ScrollController();
+  final ScrollController _returnScrollController = ScrollController();
+  // Scroll state
+  bool _hasScrolledBeyondFirstPage = false;
+  // Search state
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
 
-  @override
+  // Filter orders based on search query
+  List<DeliveryOrder> _filterDeliveryOrders(List<DeliveryOrder> orders) {
+    if (_searchQuery.isEmpty) return orders;
+    final query = _searchQuery.toLowerCase();
+    return orders.where((order) {
+      return order.orderId.toLowerCase().contains(query) ||
+          order.shippingAddress.fullName.toLowerCase().contains(query) ||
+          order.shippingAddress.phone.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  // Filter return orders based on search query
+  List<ReturnOrder> _filterReturnOrders(List<ReturnOrder> orders) {
+    if (_searchQuery.isEmpty) return orders;
+    final query = _searchQuery.toLowerCase();
+    return orders.where((order) {
+      return order.returnId.toLowerCase().contains(query) ||
+          (order.customerName?.toLowerCase().contains(query) ?? false) ||
+          (order.customerPhone?.toLowerCase().contains(query) ?? false);
+    }).toList();
+  }
+
   void initState() {
     super.initState();
     _loadUserData();
     _fetchOrders();
+    _setupScrollListeners();
+  }
+
+  void _setupScrollListeners() {
+    _deliveryScrollController.addListener(() {
+      if (_deliveryScrollController.position.pixels > 200) {
+        if (mounted && !_hasScrolledBeyondFirstPage) {
+          setState(() => _hasScrolledBeyondFirstPage = true);
+        }
+      }
+    });
+
+    _historyScrollController.addListener(() {
+      if (_historyScrollController.position.pixels > 200) {
+        if (mounted && !_hasScrolledBeyondFirstPage) {
+          setState(() => _hasScrolledBeyondFirstPage = true);
+        }
+      }
+    });
+
+    _returnScrollController.addListener(() {
+      if (_returnScrollController.position.pixels > 200) {
+        if (mounted && !_hasScrolledBeyondFirstPage) {
+          setState(() => _hasScrolledBeyondFirstPage = true);
+        }
+      }
+    });
+  }
+
+  void dispose() {
+    _deliveryScrollController.dispose();
+    _historyScrollController.dispose();
+    _returnScrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
     final name = await StorageService.getUserName();
     final avatar = await StorageService.getUserAvatar();
+    final savedOnlineStatus = await StorageService.getOnlineStatus();
     if (mounted) {
       setState(() {
         if (name != null && name.isNotEmpty) _userName = name;
         _userAvatar = avatar;
+        // Load saved online status, default to true if not set
+        _isOnline = savedOnlineStatus ?? true;
       });
     }
   }
 
-  Future<void> _fetchOrders() async {
-    setState(() {
-      _ordersLoading = true;
-      _ordersError = null;
-      _returnsLoading = true;
-      _returnsError = null;
-    });
+  Future<void> _fetchOrders({bool loadMore = false}) async {
+    if (loadMore) {
+      setState(() => _loadingMore = true);
+    } else {
+      setState(() {
+        _ordersLoading = true;
+        _ordersError = null;
+        _returnsLoading = true;
+        _returnsError = null;
+        _currentPage = 1;
+        _hasMoreOrders = true;
+        _hasMoreReturns = true;
+      });
+    }
     // Fetch delivery orders, return orders and dashboard stats in parallel
     await Future.wait([
-      OrderRepo.getDeliveryOrders()
+      OrderRepo.getDeliveryOrders(page: _currentPage, limit: _pageSize)
           .then((orders) {
-            if (mounted) setState(() => _allOrders = orders);
+            if (mounted) {
+              // Check for new orders and notify rider using HomeController (only on initial fetch, not loadMore)
+              if (!loadMore && Get.isRegistered<HomeController>()) {
+                final controller = Get.find<HomeController>();
+                controller.checkForNewOrders(
+                  orders,
+                  existingOrders: _allOrders,
+                );
+              }
+
+              setState(() {
+                if (loadMore) {
+                  _allOrders.addAll(orders);
+                } else {
+                  _allOrders = orders;
+                  _allOrdersForCounts = orders; // Use same orders for counts
+                }
+                _hasMoreOrders = orders.length >= _pageSize;
+              });
+            }
           })
           .catchError((e) {
             if (mounted) setState(() => _ordersError = e.toString());
           }),
-      OrderRepo.getReturnOrders()
+      ReturnRepo.getReturnOrders(
+            page: _currentPage,
+            limit: _pageSize, // Use pagination for return orders
+          )
           .then((returns) {
-            if (mounted) setState(() => _returnOrders = returns);
+            debugPrint('=== RETURN ORDERS FETCH START ===');
+            debugPrint('Fetched ${returns.length} return orders');
+            debugPrint('=== RETURN ORDERS FETCH END ===');
+            if (mounted) {
+              setState(() {
+                if (loadMore) {
+                  _returnOrders.addAll(returns);
+                } else {
+                  _returnOrders = returns;
+                }
+                _hasMoreReturns = returns.length >= _pageSize;
+              });
+            }
           })
           .catchError((e) {
             if (mounted) setState(() => _returnsError = e.toString());
@@ -127,13 +250,18 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _ordersLoading = false;
         _returnsLoading = false;
+        _loadingMore = false;
+
+        final ordersForCalculations = _allOrdersForCounts.isNotEmpty
+            ? _allOrdersForCounts
+            : _allOrders;
 
         // --- Recalculate local stats for accuracy ---
         final now = DateTime.now();
         int localDelivered = 0;
         double localCod = 0;
 
-        for (final o in _allOrders) {
+        for (final o in ordersForCalculations) {
           // Check if delivered TODAY
           if (o.orderStatus.toLowerCase() == 'delivered' &&
               o.deliveredAt != null) {
@@ -158,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         // --- Merge Refund Requested Delivery Orders into Returns ---
-        final refundRequestedFromDelivery = _allOrders
+        final refundRequestedFromDelivery = ordersForCalculations
             .where((o) {
               final s = o.orderStatus.toLowerCase();
               return s == 'refund_requested' ||
@@ -193,55 +321,101 @@ class _HomeScreenState extends State<HomeScreen> {
     'accepted',
     'new',
   };
-  static const _transitStatuses = {'shipped', 'out_for_delivery', 'picked_up'};
+  static const _transitStatuses = {
+    'shipped',
+    'shipping',
+    'out_for_delivery',
+    'picked_up',
+    'undelivered',
+  };
   static const _historyStatuses = {
     'delivered',
     'failed',
     'cancelled',
     'completed',
     'refund_completed',
+    'returned',
+    'refunded',
+    'return_completed',
   };
 
-  List<DeliveryOrder> get _newOrders => _allOrders
+  List<DeliveryOrder> get _baseOrders =>
+      _allOrdersForCounts.isNotEmpty ? _allOrdersForCounts : _allOrders;
+
+  List<DeliveryOrder> get _newOrders => _baseOrders
       .where((o) => _newStatuses.contains(o.orderStatus.toLowerCase()))
       .toList();
-  List<DeliveryOrder> get _inTransitOrders => _allOrders
-      .where((o) => _transitStatuses.contains(o.orderStatus.toLowerCase()))
+  List<DeliveryOrder> get _inTransitOrders => _baseOrders
+      .where(
+        (o) =>
+            _transitStatuses.contains(o.orderStatus.toLowerCase()) &&
+            !(o.undeliveredWarehouseDrop && o.isFromWarehouse),
+      )
       .toList();
-  List<DeliveryOrder> get _historyOrders => _allOrders
+  List<DeliveryOrder> get _historyOrders => _baseOrders
       .where((o) => _historyStatuses.contains(o.orderStatus.toLowerCase()))
       .toList();
 
+  // For counts, use same source (no longer separate – kept for tab badge usage)
+  List<DeliveryOrder> get _newOrdersForCount => _newOrders;
+  List<DeliveryOrder> get _inTransitOrdersForCount => _inTransitOrders;
+  List<DeliveryOrder> get _historyOrdersForCount => _historyOrders;
+
   List<ReturnOrder> get _activeReturnOrders => _returnOrders.where((o) {
     final status = o.orderStatus.toLowerCase();
+    final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+      ' ',
+      '_',
+    );
+    final replStatus = o.replacementDeliveryStatus?.toLowerCase();
+    final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+
+    // Rejected but NOT yet dropped → still active
+    if (status == 'rejected' && itemStatus != 'rejected_dropped') return true;
+
+    if (itemStatus == 'rejected_dropped') return false;
     if (_historyStatuses.contains(status)) return false;
-    if (status.contains('rejected')) {
-      final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
-        ' ',
-        '_',
-      );
-      if (itemStatus == 'rejected_dropped') return false;
+
+    // Replacement completed when delivered to customer
+    if (isReplacement &&
+        (replStatus == 'completed' || replStatus == 'delivered')) {
+      return false;
     }
+
     return true;
   }).toList();
 
   List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
     final status = o.orderStatus.toLowerCase();
+    final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+      ' ',
+      '_',
+    );
+    final replStatus = o.replacementDeliveryStatus?.toLowerCase();
+    final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+
+    // Rejected: only move to history when rider has returned item to customer (rejected_dropped)
+    if (status == 'rejected' && itemStatus == 'rejected_dropped') return true;
+    // Rejected but not yet returned to customer → still active (not in history)
+    if (status == 'rejected') return false;
+
     if (_historyStatuses.contains(status)) return true;
-    if (status.contains('rejected')) {
-      final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
-        ' ',
-        '_',
-      );
-      if (itemStatus == 'rejected_dropped') return true;
+
+    if (itemStatus == 'rejected_dropped') return true;
+
+    // Replacement completed when delivered to customer
+    if (isReplacement &&
+        (replStatus == 'completed' || replStatus == 'delivered')) {
+      return true;
     }
+
     return false;
   }).toList();
 
   /// Today's delivered COD orders for breakdown
   List<DeliveryOrder> get _todayCodOrders {
     final now = DateTime.now();
-    return _allOrders.where((o) {
+    return _baseOrders.where((o) {
       if (o.orderStatus.toLowerCase() != 'delivered' || o.deliveredAt == null) {
         return false;
       }
@@ -270,154 +444,296 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
-      body: _selectedIndex == 3
-          ? const ProfileScreen()
-          : _selectedIndex == 2
-          ? const WalletScreen()
-          : SafeArea(
-              child: Column(
-                children: [
-                  // ─── Header ──────────────────────────────────────────────────────
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 16.w,
-                      vertical: 16.h,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: AppText(
-                            text: 'Hello, $_userName',
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textnaturalcolor,
-                          ),
-                        ),
-                        // Online/Offline Toggle
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 4.w,
-                            vertical: 4.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(30.r),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Transform.scale(
-                                scale: 0.8,
-                                child: Switch(
-                                  value: _isOnline,
-                                  onChanged: (val) =>
-                                      setState(() => _isOnline = val),
-                                  activeThumbColor: AppColors.primarycolor,
-                                  activeTrackColor: AppColors.primarycolor
-                                      .withValues(alpha: 0.2),
-                                  inactiveThumbColor: Colors.grey,
-                                  inactiveTrackColor: Colors.grey[200],
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                              ),
-                              SizedBox(width: 4.w),
-                              AppText(
-                                text: _isOnline ? 'Online' : 'Offline',
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w600,
-                                color: _isOnline
-                                    ? AppColors.textnaturalcolor
-                                    : Colors.grey,
-                              ),
-                              SizedBox(width: 8.w),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+  Future<bool> _onWillPop() async {
+    if (_isOnline) {
+      final result = await Get.dialog<bool>(
+        Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(24.w),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                    size: 32.sp,
+                  ),
+                ),
+                SizedBox(height: 20.h),
+                AppText(
+                  text: 'Go Offline?',
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textnaturalcolor,
+                ),
+                SizedBox(height: 12.h),
+                AppText(
+                  text:
+                      'You are currently online. Do you want to go offline before closing the app?',
+                  fontSize: 14.sp,
+                  color: Colors.grey.shade600,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.back(result: false),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          side: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        child: AppText(
+                          text: 'Cancel',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textnaturalcolor,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          setState(() => _isOnline = false);
+                          if (Get.isRegistered<HomeController>()) {
+                            final controller = Get.find<HomeController>();
+                            await controller.toggleOnlineStatus(false);
+                          }
+                          Get.back(result: true);
+                          // Close the app
+                          SystemNavigator.pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primarycolor,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: AppText(
+                          text: 'Go Offline',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+      return result ?? false;
+    }
+    return true;
+  }
 
-                  if (_selectedIndex == 0) ...[
-                    _buildDashboard(),
-                    SizedBox(height: 16.h),
-                    // // ─── Search Bar ──────────────────────────────────────────────────
-                    // Padding(
-                    //   padding: EdgeInsets.symmetric(horizontal: 16.w),
-                    //   child: Container(
-                    //     decoration: BoxDecoration(
-                    //       color: Colors.white,
-                    //       borderRadius: BorderRadius.circular(8.r),
-                    //       border: Border.all(color: Colors.grey[200]!),
-                    //     ),
-                    //     child: TextField(
-                    //       decoration: InputDecoration(
-                    //         hintText: 'Search Order ID',
-                    //         hintStyle: TextStyle(
-                    //           color: Colors.grey[400],
-                    //           fontSize: 14.sp,
-                    //         ),
-                    //         prefixIcon: Icon(
-                    //           Icons.search,
-                    //           color: Colors.grey[400],
-                    //         ),
-                    //         border: InputBorder.none,
-                    //         contentPadding: EdgeInsets.symmetric(
-                    //           horizontal: 16.w,
-                    //           vertical: 14.h,
-                    //         ),
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
-                    // SizedBox(height: 16.h),
-
-                    // ─── Tabs ────────────────────────────────────────────────────────────────
-                    Container(
-                      height: 45.h,
-                      margin: EdgeInsets.symmetric(horizontal: 16.w),
-                      padding: EdgeInsets.all(4.w),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8.r),
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF9F9F9),
+        body: _selectedIndex == 3
+            ? const ProfileScreen()
+            : _selectedIndex == 2
+            ? const WalletScreen()
+            : SafeArea(
+                child: Column(
+                  children: [
+                    // ─── Header ──────────────────────────────────────────────────────
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16.w,
+                        vertical: 16.h,
                       ),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildTab('New', _newOrders.length, 0),
-                          _buildTab('In Transit', _inTransitOrders.length, 1),
-                          _buildTab('Returns', _activeReturnOrders.length, 2),
-                          _buildTab(
-                            'History',
-                            _historyOrders.length + _historyReturnOrders.length,
-                            3,
+                          Expanded(
+                            child: AppText(
+                              text: 'Hello, $_userName',
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textnaturalcolor,
+                            ),
+                          ),
+                          // Online/Offline Toggle
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 4.w,
+                              vertical: 4.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(30.r),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Transform.scale(
+                                  scale: 0.8,
+                                  child: Switch(
+                                    value: _isOnline,
+                                    onChanged: (val) async {
+                                      setState(() => _isOnline = val);
+                                      // Call the controller method to sync with API
+                                      if (Get.isRegistered<HomeController>()) {
+                                        final controller =
+                                            Get.find<HomeController>();
+                                        await controller.toggleOnlineStatus(
+                                          val,
+                                        );
+                                      }
+                                    },
+                                    activeThumbColor: AppColors.primarycolor,
+                                    activeTrackColor: AppColors.primarycolor
+                                        .withValues(alpha: 0.2),
+                                    inactiveThumbColor: Colors.grey,
+                                    inactiveTrackColor: Colors.grey[200],
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                                SizedBox(width: 4.w),
+                                AppText(
+                                  text: _isOnline ? 'Online' : 'Offline',
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: _isOnline
+                                      ? AppColors.textnaturalcolor
+                                      : Colors.grey,
+                                ),
+                                SizedBox(width: 8.w),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: 16.h),
 
-                    // ─── Order / Return List ──────────────────────────────────────────
-                    Expanded(
-                      child: _selectedTab == 3
-                          ? _buildHistoryList()
-                          : (_isReturnTab
-                                ? _buildReturnList()
-                                : _buildDeliveryList()),
-                    ),
-                  ] else if (_selectedIndex == 1) ...[
-                    const Expanded(child: RouteScreen()),
+                    if (_selectedIndex == 0) ...[
+                      _buildDashboard(),
+                      SizedBox(height: 16.h),
+
+                      Container(
+                        height: 45.h,
+                        margin: EdgeInsets.symmetric(horizontal: 16.w),
+                        padding: EdgeInsets.all(4.w),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildTab('New', _newOrdersForCount.length, 0),
+                            _buildTab(
+                              'In Transit',
+                              _inTransitOrdersForCount.length,
+                              1,
+                            ),
+                            _buildTab('Returns', _activeReturnOrders.length, 2),
+                            _buildTab(
+                              'History',
+                              _historyOrdersForCount.length +
+                                  _historyReturnOrders.length,
+                              3,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+
+                      // ─── Search Bar ──────────────────────────────────────────────────
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (value) {
+                              setState(() => _searchQuery = value);
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Search by customer phone',
+                              hintStyle: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14.sp,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search,
+                                color: Colors.grey[400],
+                              ),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(
+                                        Icons.clear,
+                                        color: Colors.grey[400],
+                                      ),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _searchQuery = '');
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16.w,
+                                vertical: 12.h,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+
+                      // ─── Order / Return List ──────────────────────────────────────────
+                      Expanded(
+                        child: _selectedTab == 3
+                            ? _buildHistoryList()
+                            : (_isReturnTab
+                                  ? _buildReturnList()
+                                  : _buildDeliveryList()),
+                      ),
+                    ] else if (_selectedIndex == 1) ...[
+                      const Expanded(child: RouteScreen()),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
 
-      bottomNavigationBar: _buildCustomBottomNav(),
+        bottomNavigationBar: _buildCustomBottomNav(),
+      ),
     );
   }
 
@@ -646,22 +962,27 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool isSelected = _selectedTab == index;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = index),
+        onTap: () => setState(() {
+          _selectedTab = index;
+          // Reset visible counts on tab switch
+          _visibleNewCount = _pageLimit;
+          _visibleHistoryCount = _pageLimit;
+          _visibleReturnCount = _pageLimit;
+        }),
         child: Container(
           padding: EdgeInsets.symmetric(vertical: 8.h),
           decoration: BoxDecoration(
             color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(6.r),
-            boxShadow:
-                isSelected
-                    ? [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                    : null,
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Center(
             child: Stack(
@@ -671,7 +992,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   text: label,
                   fontSize: 13.sp,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                  color: isSelected ? AppColors.primarycolor : Colors.grey[600]!,
+                  color: isSelected
+                      ? AppColors.primarycolor
+                      : Colors.grey[600]!,
                   maxLines: 1,
                 ),
                 if (count > 0)
@@ -679,7 +1002,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     top: -10.h,
                     right: -14.w,
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 5.w,
+                        vertical: 1.h,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFEF4444), // Vibrant Red
                         borderRadius: BorderRadius.circular(10.r),
@@ -708,32 +1034,43 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_ordersError != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
-            SizedBox(height: 12.h),
-            AppText(
-              text: 'Could not load orders',
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600]!,
+      return RefreshIndicator(
+        onRefresh: _fetchOrders,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 400.h,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.wifi_off_rounded,
+                    size: 48.sp,
+                    color: Colors.grey[400],
+                  ),
+                  SizedBox(height: 12.h),
+                  AppText(
+                    text: 'Could not load orders',
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600]!,
+                  ),
+                ],
+              ),
             ),
-            SizedBox(height: 8.h),
-            TextButton.icon(
-              onPressed: _fetchOrders,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
+          ),
         ),
       );
     }
-    final orders = _currentOrders;
+    final allOrders = _filterDeliveryOrders(_currentOrders);
+    final orders = allOrders.take(_visibleNewCount).toList();
+    final bool showLoadMore =
+        orders.length < allOrders.length ||
+        (_hasMoreOrders && allOrders.length >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
-      child: orders.isEmpty
+      child: allOrders.isEmpty
           ? SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: SizedBox(
@@ -749,10 +1086,29 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           : ListView.separated(
+              controller: _deliveryScrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.all(16.w),
-              itemCount: orders.length,
+              itemCount: orders.length + (showLoadMore ? 1 : 0),
               separatorBuilder: (_, _) => SizedBox(height: 12.h),
-              itemBuilder: (context, index) => _buildOrderCard(orders[index]),
+              itemBuilder: (context, index) {
+                if (showLoadMore && index == orders.length) {
+                  return _AnimatedLoadMoreButton(
+                    loading: _loadingMore,
+                    onPressed: () {
+                      setState(() {
+                        if (_visibleNewCount < allOrders.length) {
+                          _visibleNewCount += _pageLimit;
+                        } else {
+                          _currentPage++;
+                          _fetchOrders(loadMore: true);
+                        }
+                      });
+                    },
+                  );
+                }
+                return _buildOrderCard(orders[index]);
+              },
             ),
     );
   }
@@ -762,34 +1118,46 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_ordersError != null && _returnsError != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
-            SizedBox(height: 12.h),
-            AppText(
-              text: 'Could not load history',
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600]!,
+      return RefreshIndicator(
+        onRefresh: _fetchOrders,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 400.h,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.wifi_off_rounded,
+                    size: 48.sp,
+                    color: Colors.grey[400],
+                  ),
+                  SizedBox(height: 12.h),
+                  AppText(
+                    text: 'Could not load history',
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600]!,
+                  ),
+                ],
+              ),
             ),
-            SizedBox(height: 8.h),
-            TextButton.icon(
-              onPressed: _fetchOrders,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
+          ),
         ),
       );
     }
-    final delOrders = _historyOrders;
-    final retOrders = _historyReturnOrders;
-    final totalCount = delOrders.length + retOrders.length;
+    final allDel = _filterDeliveryOrders(_historyOrders);
+    final allRet = _filterReturnOrders(_historyReturnOrders);
+    final allCombined = [...allRet, ...allDel];
+    final totalAll = allCombined.length;
+    final combinedOrders = allCombined.take(_visibleHistoryCount).toList();
+    final totalCount = combinedOrders.length;
+    final bool showLoadMore =
+        totalCount < totalAll || (_hasMoreOrders && totalAll >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
-      child: totalCount == 0
+      child: totalAll == 0
           ? SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: SizedBox(
@@ -805,14 +1173,32 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           : ListView.separated(
+              controller: _historyScrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.all(16.w),
-              itemCount: totalCount,
+              itemCount: totalCount + (showLoadMore ? 1 : 0),
               separatorBuilder: (_, _) => SizedBox(height: 12.h),
               itemBuilder: (context, index) {
-                if (index < delOrders.length) {
-                  return _buildOrderCard(delOrders[index]);
+                if (showLoadMore && index == totalCount) {
+                  return _AnimatedLoadMoreButton(
+                    loading: _loadingMore,
+                    onPressed: () {
+                      setState(() {
+                        if (_visibleHistoryCount < totalAll) {
+                          _visibleHistoryCount += _pageLimit;
+                        } else {
+                          _currentPage++;
+                          _fetchOrders(loadMore: true);
+                        }
+                      });
+                    },
+                  );
+                }
+                final order = combinedOrders[index];
+                if (order is ReturnOrder) {
+                  return _buildReturnCard(order);
                 } else {
-                  return _buildReturnCard(retOrders[index - delOrders.length]);
+                  return _buildOrderCard(order as DeliveryOrder);
                 }
               },
             ),
@@ -824,30 +1210,37 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_returnsError != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
-            SizedBox(height: 12.h),
-            AppText(
-              text: 'Could not load returns',
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600]!,
+      return RefreshIndicator(
+        onRefresh: _fetchOrders,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 400.h,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.wifi_off_rounded,
+                    size: 48.sp,
+                    color: Colors.grey[400],
+                  ),
+                  SizedBox(height: 12.h),
+                  AppText(
+                    text: 'Could not load returns',
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600]!,
+                  ),
+                ],
+              ),
             ),
-            SizedBox(height: 8.h),
-            TextButton.icon(
-              onPressed: _fetchOrders,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
+          ),
         ),
       );
     }
-    final activeReturns = _activeReturnOrders;
-    if (activeReturns.isEmpty) {
+    final allReturns = _filterReturnOrders(_activeReturnOrders);
+    if (allReturns.isEmpty) {
       return Center(
         child: AppText(
           text: 'No active returns',
@@ -857,13 +1250,36 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+    final activeReturns = allReturns.take(_visibleReturnCount).toList();
+    final bool showLoadMore =
+        activeReturns.length < allReturns.length ||
+        (_hasMoreReturns && allReturns.length >= _pageSize);
     return RefreshIndicator(
       onRefresh: _fetchOrders,
       child: ListView.separated(
+        controller: _returnScrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.all(16.w),
-        itemCount: activeReturns.length,
+        itemCount: activeReturns.length + (showLoadMore ? 1 : 0),
         separatorBuilder: (_, _) => SizedBox(height: 12.h),
-        itemBuilder: (context, index) => _buildReturnCard(activeReturns[index]),
+        itemBuilder: (context, index) {
+          if (showLoadMore && index == activeReturns.length) {
+            return _AnimatedLoadMoreButton(
+              loading: _loadingMore,
+              onPressed: () {
+                setState(() {
+                  if (_visibleReturnCount < allReturns.length) {
+                    _visibleReturnCount += _pageLimit;
+                  } else {
+                    _currentPage++;
+                    _fetchOrders(loadMore: true);
+                  }
+                });
+              },
+            );
+          }
+          return _buildReturnCard(activeReturns[index]);
+        },
       ),
     );
   }
@@ -1032,43 +1448,120 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 SizedBox(width: 16.w),
                 Expanded(
-                  child: SizedBox(
-                    height: 36.h,
-                    child: AppButton(
-                      onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ReturnDetailsScreen(returnOrder: ret),
-                          ),
+                  child: () {
+                    final bool isRejected = ret.orderStatus
+                        .toLowerCase()
+                        .contains('rejected');
+                    final String itemStatusClean =
+                        (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+                          ' ',
+                          '_',
                         );
-                        if (result == true && mounted) {
-                          _fetchOrders();
-                        }
-                      },
-                      btncolor: AppColors.primarycolor,
-                      borderRadius: 6.r,
-                      buttonStyle: ButtonStyle(
-                        backgroundColor: WidgetStateProperty.all(
-                          AppColors.primarycolor,
-                        ),
-                        shape: WidgetStateProperty.all(
-                          RoundedRectangleBorder(
+
+                    final bool isCompleted =
+                        // Rejected orders: only complete when rider has returned item to customer
+                        (isRejected && itemStatusClean == 'rejected_dropped') ||
+                        // Normal (non-rejected) refund/replacement orders
+                        (!isRejected &&
+                            _historyStatuses.contains(
+                              ret.orderStatus.toLowerCase(),
+                            )) ||
+                        // Replacement: completed when replacementDeliveryStatus is 'completed' or 'delivered'
+                        // Note: 'received' now means picker picked from hub (intermediate step)
+                        (ret.returnType?.toLowerCase() == 'replacement' &&
+                            (ret.replacementDeliveryStatus?.toLowerCase() ==
+                                    'completed' ||
+                                ret.replacementDeliveryStatus?.toLowerCase() ==
+                                    'delivered'));
+
+                    if (isCompleted) {
+                      final bool showAsRejectedDropped =
+                          itemStatusClean == 'rejected_dropped';
+                      final bool isReplacement =
+                          ret.returnType?.toLowerCase() == 'replacement';
+                      final String completedText = showAsRejectedDropped
+                          ? (isReplacement ? 'Replaced' : 'Refunded')
+                          : (isReplacement ? 'Replaced' : 'Refunded');
+                      return GestureDetector(
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ReturnDetailsScreen(returnOrder: ret),
+                            ),
+                          );
+                          if (result == true && mounted) {
+                            _fetchOrders();
+                          }
+                        },
+                        child: Container(
+                          height: 36.h,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE6F4EE),
                             borderRadius: BorderRadius.circular(6.r),
                           ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                color: const Color(0xFF1E7E4C),
+                                size: 14.sp,
+                              ),
+                              SizedBox(width: 4.w),
+                              AppText(
+                                text: completedText,
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E7E4C),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return SizedBox(
+                      height: 36.h,
+                      child: AppButton(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ReturnDetailsScreen(returnOrder: ret),
+                            ),
+                          );
+                          if (result == true && mounted) {
+                            _fetchOrders();
+                          }
+                        },
+                        btncolor: AppColors.primarycolor,
+                        borderRadius: 6.r,
+                        buttonStyle: ButtonStyle(
+                          backgroundColor: WidgetStateProperty.all(
+                            AppColors.primarycolor,
+                          ),
+                          shape: WidgetStateProperty.all(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6.r),
+                            ),
+                          ),
+                        ),
+                        child: AppText(
+                          text: isRejected
+                              ? 'Start Refund'
+                              : ret.returnType?.toLowerCase() == 'replacement'
+                              ? 'Start Replacement'
+                              : 'Start Refund',
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
-                      child: AppText(
-                        text: ret.returnType?.toLowerCase() == 'replacement'
-                            ? 'Start Replacement'
-                            : 'Start Refund',
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+                    );
+                  }(),
                 ),
               ],
             ),
@@ -1130,13 +1623,15 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(height: 8.h),
 
             // Pickup section
-            if (order.dispatch?.destination != null &&
+            if (order.dispatch != null &&
                 order.orderStatus.toLowerCase() != 'delivered') ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    Icons.store_outlined,
+                    order.isFromWarehouse
+                        ? Icons.inventory_2_outlined
+                        : Icons.local_shipping_outlined,
                     size: 14.sp,
                     color: const Color(0xFF6366F1),
                   ),
@@ -1153,7 +1648,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         SizedBox(height: 2.h),
                         AppText(
-                          text: order.dispatch!.destination,
+                          text: order.isFromWarehouse
+                              ? 'Warehouse'
+                              : 'Delivery Hub',
                           fontSize: 12.sp,
                           color: AppColors.textnaturalcolor,
                           maxLines: 1,
@@ -1436,8 +1933,17 @@ class _HomeScreenState extends State<HomeScreen> {
     if (index == 0) {
       badgeCount = _newOrders.length;
     } else if (index == 1) {
-      // Route screen shows all active delivery orders (New + In Transit)
-      badgeCount = _newOrders.length + _inTransitOrders.length;
+      // Route badge shows total active orders (New + In Transit excluding undelivered) + active return orders
+      // Deduplicate orders that might appear in both New and In Transit
+      final allActiveOrders = [..._newOrders, ..._inTransitOrders];
+      final uniqueOrderIds = <String>{};
+      final uniqueActiveOrders = allActiveOrders.where((o) {
+        if (o.orderStatus.toLowerCase() == 'undelivered') return false;
+        if (uniqueOrderIds.contains(o.orderId)) return false;
+        uniqueOrderIds.add(o.orderId);
+        return true;
+      }).toList();
+      badgeCount = uniqueActiveOrders.length + _activeReturnOrders.length;
     }
 
     return GestureDetector(
@@ -1458,16 +1964,15 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primarycolor : Colors.transparent,
           borderRadius: BorderRadius.circular(20.r),
-          boxShadow:
-              isSelected
-                  ? [
-                    BoxShadow(
-                      color: AppColors.primarycolor.withValues(alpha: 0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                  : [],
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primarycolor.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1487,19 +1992,18 @@ class _HomeScreenState extends State<HomeScreen> {
             AnimatedSize(
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeOutQuint,
-              child:
-                  isSelected
-                      ? Padding(
-                        padding: EdgeInsets.only(left: 8.w),
-                        child: AppText(
-                          text: label,
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          maxLines: 1,
-                        ),
-                      )
-                      : const SizedBox.shrink(),
+              child: isSelected
+                  ? Padding(
+                      padding: EdgeInsets.only(left: 8.w),
+                      child: AppText(
+                        text: label,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        maxLines: 1,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ],
         ),
@@ -1566,6 +2070,105 @@ class _HomeScreenState extends State<HomeScreen> {
       isSelected ? activeIcon : icon,
       color: isSelected ? Colors.white : Colors.grey[400],
       size: 22.sp,
+    );
+  }
+}
+
+// ─── Animated Load More Button ────────────────────────────────────────────────
+
+class _AnimatedLoadMoreButton extends StatefulWidget {
+  final bool loading;
+  final VoidCallback onPressed;
+
+  const _AnimatedLoadMoreButton({
+    required this.loading,
+    required this.onPressed,
+  });
+
+  State<_AnimatedLoadMoreButton> createState() =>
+      _AnimatedLoadMoreButtonState();
+}
+
+class _AnimatedLoadMoreButtonState extends State<_AnimatedLoadMoreButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.4),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    // Small delay so it appears after the list is rendered
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (mounted) _ctrl.forward();
+    });
+  }
+
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: widget.loading ? null : widget.onPressed,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primarycolor,
+                side: BorderSide(color: AppColors.primarycolor, width: 1.5),
+                padding: EdgeInsets.symmetric(vertical: 13.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                backgroundColor: AppColors.primarycolor.withValues(alpha: 0.04),
+              ),
+              child: widget.loading
+                  ? SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primarycolor,
+                        ),
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.expand_more_rounded,
+                          size: 18.sp,
+                          color: AppColors.primarycolor,
+                        ),
+                        SizedBox(width: 6.w),
+                        AppText(
+                          text: 'Load More',
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primarycolor,
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

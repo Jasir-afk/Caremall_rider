@@ -3,17 +3,16 @@ import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/app/utils/network/auth_service.dart';
 import 'package:care_mall_rider/app/utils/spaces.dart';
+import 'package:care_mall_rider/core/routes/app_routes.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
-import 'package:care_mall_rider/src/modules/kyc/view/kyc_verification_screen.dart';
+import 'package:care_mall_rider/src/modules/auth/controller/auth_controller.dart';
+import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-
-import 'package:care_mall_rider/src/modules/home_screen/view/home_screen.dart';
-import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
+import 'package:get/get.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -29,23 +28,22 @@ class OTPVerificationScreen extends StatefulWidget {
     this.email,
   });
 
-  @override
   State<OTPVerificationScreen> createState() => _OTPVerificationScreenState();
 }
 
 class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
+  late final AuthController _authController;
   final List<TextEditingController> _otpControllers = List.generate(
     6,
     (_) => TextEditingController(),
   );
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
-  bool _isLoading = false;
-  bool _isResending = false;
   Timer? _timer;
   int _start = 30;
-  @override
+
   void initState() {
     super.initState();
+    _authController = Get.find<AuthController>();
     startTimer();
   }
 
@@ -64,7 +62,6 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     });
   }
 
-  @override
   void dispose() {
     _timer?.cancel();
     for (var controller in _otpControllers) {
@@ -86,129 +83,35 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       );
       return;
     }
-    setState(() => _isLoading = true);
-    try {
-      final result = await AuthService.verifyOtp(
-        phone: widget.phoneNumber,
-        otp: otp,
-      );
-      // ── Always save login state first (before any context use) ────────
-      final bool isSuccess = result['success'] == true;
-      if (isSuccess) {
-        final token = result['token']?.toString() ?? '';
-        if (token.isNotEmpty) {
-          await StorageService.saveAuthToken(token);
-        }
-        // Save user profile data
-        final responseData = result['data'] ?? {};
-        final userData = responseData['deliveryBoy'] ?? {};
-        if (userData.isNotEmpty) {
-          if (userData['name'] != null) {
-            await StorageService.saveUserName(userData['name'].toString());
-          }
-          if (userData['email'] != null) {
-            await StorageService.saveUserEmail(userData['email'].toString());
-          }
-          if (userData['phone'] != null) {
-            await StorageService.savePhoneNumber(userData['phone'].toString());
-          }
-          if (userData['kyc'] != null && userData['kyc']['status'] != null) {
-            await StorageService.saveKycStatus(
-              userData['kyc']['status'].toString(),
-            );
-          } else if (userData['status'] != null) {
-            await StorageService.saveKycStatus(userData['status'].toString());
-          }
-        }
-      }
-      // ──────────────────────────────────────────────────────────────────
-      if (!mounted) return;
-      if (isSuccess) {
-        if (mounted) {
-          AppSnackbar.showSuccess(
-            title: 'Verified',
-            message: result['message'] ?? 'OTP verified successfully!',
-          );
-        }
-        if (isSuccess) {
-          // Check KYC status before navigating
-          await KycRepo.getKycStatus();
-          final bool isKycDone = await StorageService.isKycCompleted();
-          if (mounted) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (_) => isKycDone
-                    ? const HomeScreen()
-                    : const KycVerificationScreen(),
-              ),
-              (route) => false,
-            );
-          }
-        }
-      } else {
-        if (mounted) {
-          AppSnackbar.showError(
-            title: 'Verification Failed',
-            message: result['message'] ?? 'Invalid OTP. Please try again.',
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        AppSnackbar.showError(title: 'Error', message: e.toString());
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+
+    _authController.verifyOtp(
+      phone: widget.phoneNumber,
+      otp: otp,
+      onSuccess: () async {
+        // Check KYC status before navigating
+        await KycRepo.getKycStatus();
+        final bool isKycDone = await StorageService.isKycCompleted();
+        Get.offAllNamed(isKycDone ? AppRoutes.home : AppRoutes.kyc);
+      },
+    );
   }
 
-  Future<void> _resendOTP() async {
-    setState(() {
-      _isResending = true;
-    });
-    try {
-      final result = await AuthService.sendOtp(
-        phone: widget.phoneNumber,
-        mode: widget.mode,
-        name: widget.name ?? '',
-        email: widget.email ?? '',
-      );
-
-      if (mounted) {
-        if (result['success']) {
-          AppSnackbar.showSuccess(title: 'Resent', message: result['message']);
-        } else {
-          AppSnackbar.showError(
-            title: 'Resend Failed',
-            message: result['message'],
-          );
-        }
-        if (result['success']) {
-          setState(() {
-            _start = 30;
-          });
-          startTimer();
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        AppSnackbar.showError(title: 'Error', message: e.toString());
-      }
-    } finally {
-      if (mounted) {
+  void _resendOTP() {
+    _authController.resendOtp(
+      mode: widget.mode,
+      onSuccess: () {
         setState(() {
-          _isResending = false;
+          _start = 30;
         });
-      }
-    }
+        startTimer();
+      },
+    );
   }
 
   void _editNumber() {
-    Navigator.pop(context);
+    Get.back();
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -216,7 +119,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         backgroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Get.back(),
         ),
       ),
       body: SafeArea(
@@ -360,44 +263,48 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                   defaultSpacerLarge,
                   // Resend OTP
                   Center(
-                    child: _isResending
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : _start > 0
-                        ? AppText(
-                            text: 'Resend OTP in $_start s',
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey,
-                          )
-                        : TextButton(
-                            onPressed: _resendOTP,
-                            child: AppText(
-                              text: 'Resend OTP',
+                    child: Obx(
+                      () => _authController.isResendingOtp.value
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : _start > 0
+                          ? AppText(
+                              text: 'Resend OTP in $_start s',
                               fontSize: 16.sp,
                               fontWeight: FontWeight.w500,
-                              color: Colors.red,
+                              color: Colors.grey,
+                            )
+                          : TextButton(
+                              onPressed: _resendOTP,
+                              child: AppText(
+                                text: 'Resend OTP',
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.red,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                   defaultSpacer,
 
                   // Verify Button
-                  AppButton(
-                    isLoading: _isLoading,
-                    child: AppText(
-                      text: "Verify OTP",
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.whitecolor,
+                  Obx(
+                    () => AppButton(
+                      isLoading: _authController.isLoading.value,
+                      child: AppText(
+                        text: "Verify OTP",
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.whitecolor,
+                      ),
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        _verifyOTP();
+                      },
                     ),
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      _verifyOTP();
-                    },
                   ),
                   defaultSpacer,
 

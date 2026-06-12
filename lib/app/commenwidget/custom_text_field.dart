@@ -30,7 +30,7 @@ class CustomTextField extends StatelessWidget {
     this.readOnly = false,
     this.maxLines = 1,
   });
-  @override
+
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,12 +57,18 @@ class CustomTextField extends StatelessWidget {
           style: TextStyle(fontSize: 14.sp, color: AppColors.textblackcolor),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: TextStyle(fontSize: 14.sp, color: AppColors.textDefaultSecondarycolor),
+            hintStyle: TextStyle(
+              fontSize: 14.sp,
+              color: AppColors.textDefaultSecondarycolor,
+            ),
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
             filled: true,
             fillColor: AppColors.whitecolor,
-            contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16.w,
+              vertical: 14.h,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
               borderSide: const BorderSide(color: AppColors.bordercolor),
@@ -73,7 +79,10 @@ class CustomTextField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
-              borderSide: const BorderSide(color: AppColors.primarycolor, width: 1.5),
+              borderSide: const BorderSide(
+                color: AppColors.primarycolor,
+                width: 1.5,
+              ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
@@ -81,7 +90,10 @@ class CustomTextField extends StatelessWidget {
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
-              borderSide: const BorderSide(color: AppColors.errorMain, width: 1.5),
+              borderSide: const BorderSide(
+                color: AppColors.errorMain,
+                width: 1.5,
+              ),
             ),
           ),
         ),

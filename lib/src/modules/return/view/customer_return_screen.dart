@@ -1,8 +1,8 @@
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
-import 'package:care_mall_rider/src/modules/home_screen/model/return_order_model.dart';
+import 'package:care_mall_rider/src/modules/return/controller/return_repo.dart';
+import 'package:care_mall_rider/src/modules/return/model/return_order_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,7 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 class CustomerReturnScreen extends StatefulWidget {
   final ReturnOrder returnOrder;
   const CustomerReturnScreen({super.key, required this.returnOrder});
-  @override
+
   State<CustomerReturnScreen> createState() => _CustomerReturnScreenState();
 }
 
@@ -21,9 +21,8 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
   bool _updatingStatus = false;
   bool _hasChanged = false;
   bool _detailsConfirmed = false;
-  String? _returnMethod; // 'received' or 'dropped'
+  String? _returnMethod; // 'picked' or 'dropped'
 
-  @override
   void initState() {
     super.initState();
     _initMethod();
@@ -31,9 +30,9 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
   }
 
   void _initMethod() {
-    // If not picked yet, default to received
+    // If not picked yet, default to picked
     if (!_display.isPicked) {
-      _returnMethod = 'received';
+      _returnMethod = 'picked';
     } else if (!_display.isDropped) {
       // If picked but not dropped, don't auto-select unless it was already the method
       if (_returnMethod != 'dropped') {
@@ -50,7 +49,7 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
       _error = null;
     });
     try {
-      final detail = await OrderRepo.getReturnDetail(widget.returnOrder.id);
+      final detail = await ReturnRepo.getReturnDetail(widget.returnOrder.id);
       if (mounted) {
         setState(() {
           _detail = detail;
@@ -65,7 +64,7 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
   }
 
   ReturnOrder get _display => _detail ?? widget.returnOrder;
-  @override
+
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
@@ -87,39 +86,37 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
             fontWeight: FontWeight.w600,
             color: AppColors.textnaturalcolor,
           ),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.refresh, color: Colors.grey[600]),
-              onPressed: _fetchDetail,
-            ),
-          ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 48.sp,
-                      color: Colors.grey[400],
+            ? RefreshIndicator(
+                onRefresh: _fetchDetail,
+                color: AppColors.primarycolor,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.8,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.wifi_off_rounded,
+                            size: 48.sp,
+                            color: Colors.grey[400],
+                          ),
+                          SizedBox(height: 12.h),
+                          AppText(
+                            text: 'Could not load details',
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[600]!,
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: 12.h),
-                    AppText(
-                      text: 'Could not load details',
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[600]!,
-                    ),
-                    SizedBox(height: 8.h),
-                    TextButton.icon(
-                      onPressed: _fetchDetail,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                    ),
-                  ],
+                  ),
                 ),
               )
             : _buildContent(),
@@ -227,7 +224,7 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
                 Expanded(
                   child: _buildMethodButton(
                     'Received',
-                    _returnMethod == 'received',
+                    _returnMethod == 'picked',
                     ret.isPicked,
                     ((ret.isPicked &&
                                 ret.orderStatus.toLowerCase() != 'rejected') ||
@@ -238,7 +235,7 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
                                 (ret.returnItemStatus?.toLowerCase() ?? '')
                                     .contains('dropped')))
                         ? null
-                        : () => setState(() => _returnMethod = 'received'),
+                        : () => setState(() => _returnMethod = 'picked'),
                   ),
                 ),
                 SizedBox(width: 4.w),
@@ -439,18 +436,18 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
 
   Future<void> _confirmAction() async {
     if (_returnMethod == null) return;
-    final targetStatus = _returnMethod; // 'received' or 'dropped'
+    final targetStatus = _returnMethod; // 'picked' or 'dropped'
     if (targetStatus == null) return;
 
     try {
       setState(() => _updatingStatus = true);
-      final isReceived = targetStatus == 'received';
-      final result = await OrderRepo.updateReturnItemStatus(
+      final isPicked = targetStatus == 'picked';
+      final result = await ReturnRepo.updateReturnItemStatus(
         returnId: widget.returnOrder.id,
         returnItemStatus: targetStatus,
-        pickupStatus: !isReceived ? 'item_delivered' : null,
-        isPicked: isReceived ? true : null,
-        isDropped: !isReceived ? true : null,
+        pickupStatus: !isPicked ? 'item_delivered' : null,
+        isPicked: isPicked ? true : null,
+        isDropped: !isPicked ? true : null,
       );
 
       if (mounted) {
@@ -513,7 +510,6 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
       case 'not_applicable':
       case 'rejected_picked':
       case 'rejected_dropped':
-      case 'rejected_sent':
       case 'rejected_received':
         return const Color(0xFFFFE3E3);
       case 'shipped':
@@ -521,7 +517,6 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
       case 'item_picked':
       case 'approved':
       case 'picked':
-      case 'sent':
         return const Color(0xFFE8F0FE);
       case 'pending':
       case 'requested':
@@ -547,14 +542,12 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
       case 'not_applicable':
       case 'rejected_picked':
       case 'rejected_dropped':
-      case 'rejected_sent':
       case 'rejected_received':
         return const Color(0xFFDC2626);
       case 'shipped':
       case 'out_for_delivery':
       case 'item_picked':
       case 'picked':
-      case 'sent':
         return AppColors.primarycolor;
       case 'pending':
       case 'requested':

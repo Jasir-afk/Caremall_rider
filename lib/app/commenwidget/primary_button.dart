@@ -25,7 +25,6 @@ class PrimaryButton extends StatelessWidget {
     this.isOutline = false,
   });
 
-  @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: width ?? double.infinity,

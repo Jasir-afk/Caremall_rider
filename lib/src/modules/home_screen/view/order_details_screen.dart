@@ -3,6 +3,8 @@ import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
+import 'package:care_mall_rider/core/services/storage_service.dart';
+import 'package:care_mall_rider/src/modules/home_screen/controller/home_controller.dart';
 import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
 import 'package:care_mall_rider/src/modules/home_screen/model/delivery_order_model.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +19,7 @@ class OrderDetailsScreen extends StatefulWidget {
   /// detail (including items) using [order.id] on load.
   final DeliveryOrder order;
   const OrderDetailsScreen({super.key, required this.order});
-  @override
+
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
 }
 
@@ -33,10 +35,116 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       false; // Tracks if photo was uploaded in current session
   bool _updatingStatus = false;
 
-  @override
   void initState() {
     super.initState();
     _fetchDetail();
+  }
+
+  /// Check if rider is online, if not show dialog to go online
+  /// Returns true if rider is online or went online, false if cancelled
+  Future<bool> _checkOnlineStatus() async {
+    // Check from storage first
+    final savedStatus = await StorageService.getOnlineStatus();
+    final isOnline = savedStatus ?? true;
+
+    if (!isOnline) {
+      final result = await Get.dialog<bool>(
+        Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(24.w),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                    size: 32.sp,
+                  ),
+                ),
+                SizedBox(height: 20.h),
+                AppText(
+                  text: 'Go Online?',
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textnaturalcolor,
+                ),
+                SizedBox(height: 12.h),
+                AppText(
+                  text:
+                      'You are currently offline. You need to go online to perform this action.',
+                  fontSize: 14.sp,
+                  color: Colors.grey.shade600,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.back(result: false),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          side: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        child: AppText(
+                          text: 'Cancel',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textnaturalcolor,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          // Go online
+                          if (Get.isRegistered<HomeController>()) {
+                            final controller = Get.find<HomeController>();
+                            await controller.toggleOnlineStatus(true);
+                          }
+                          Get.back(result: true);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primarycolor,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: AppText(
+                          text: 'Go Online',
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+      return result ?? false;
+    }
+    return true;
   }
 
   Future<void> _fetchDetail() async {
@@ -149,13 +257,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  Future<void> _reportFailedDelivery() async {
+  Future<void> _markUndelivered() async {
     final TextEditingController reasonController = TextEditingController();
 
     Get.dialog(
       AlertDialog(
+        backgroundColor: Colors.white,
         title: AppText(
-          text: 'Cannot Deliver',
+          text: 'Mark Undelivered',
           fontSize: 18.sp,
           fontWeight: FontWeight.w700,
         ),
@@ -164,7 +273,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AppText(
-              text: 'Please provide a reason for the delivery failure:',
+              text:
+                  'Please provide a reason for marking this order as undelivered:',
               fontSize: 14.sp,
             ),
             SizedBox(height: 12.h),
@@ -193,23 +303,28 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 return;
               }
               Get.back();
+
               setState(() => _updatingStatus = true);
-              final result = await OrderRepo.reportFailedOrder(
+              final result = await OrderRepo.updateOrderStatus(
                 orderId: widget.order.id,
-                reason: reason,
+                status: 'undelivered',
+                isUndelivered: true,
+                undeliveredWarehouseDrop: false,
+                note: reason,
               );
               if (mounted) setState(() => _updatingStatus = false);
 
               if (result['success'] == true) {
                 AppSnackbar.showSuccess(
                   title: 'Success',
-                  message: 'Delivery failure reported.',
+                  message: 'Order marked as undelivered.',
                 );
                 _fetchDetail();
+                _hasChanged = true;
               } else {
                 AppSnackbar.showError(
                   title: 'Error',
-                  message: result['message'] ?? 'Failed to report failure.',
+                  message: result['message'] ?? 'Failed to update status.',
                 );
               }
             },
@@ -217,14 +332,78 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               backgroundColor: AppColors.errorMain,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Report'),
+            child: const Text('Confirm'),
           ),
         ],
       ),
     );
   }
 
+  Future<void> _markWarehouseDrop() async {
+    // Check if rider is online
+    final isOnline = await _checkOnlineStatus();
+    if (!isOnline) return;
+
+    final confirmed = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: Colors.white,
+        title: AppText(
+          text: 'Confirm Warehouse Drop',
+          fontSize: 18.sp,
+          fontWeight: FontWeight.w700,
+        ),
+        content: AppText(
+          text:
+              'Are you sure you want to mark this order as dropped at warehouse?',
+          fontSize: 14.sp,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: AppText(
+              text: 'Cancel',
+              fontSize: 14.sp,
+              color: AppColors.textnaturalcolor,
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primarycolor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _updatingStatus = true);
+    final result = await OrderRepo.markWarehouseDrop(orderId: widget.order.id);
+    if (mounted) setState(() => _updatingStatus = false);
+
+    if (result['success'] == true) {
+      AppSnackbar.showSuccess(
+        title: 'Success',
+        message: 'Order dropped at warehouse.',
+      );
+      _fetchDetail();
+      _hasChanged = true;
+    } else {
+      AppSnackbar.showError(
+        title: 'Error',
+        message: result['message'] ?? 'Failed to mark warehouse drop.',
+      );
+    }
+  }
+
   Future<void> _deliverOrder() async {
+    // Check if rider is online
+    final isOnline = await _checkOnlineStatus();
+    if (!isOnline) return;
+
     // If it's a COD order, ensure payment collected is checked
     final bool isCod = _display.isCod;
     if (isCod && !_paymentCollected) {
@@ -296,6 +475,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Future<void> _pickUpOrder() async {
+    // Check if rider is online
+    final isOnline = await _checkOnlineStatus();
+    if (!isOnline) return;
+
+    final source = _display.isFromWarehouse ? 'warehouse' : 'delivery hub';
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
         backgroundColor: Colors.white,
@@ -305,7 +489,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           fontWeight: FontWeight.w700,
         ),
         content: AppText(
-          text: 'Are you picking up this order from the warehouse?',
+          text: 'Are you picking up this order from the $source?',
           fontSize: 14.sp,
         ),
         actions: [
@@ -349,7 +533,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
@@ -395,25 +578,33 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   // ── Error state ────────────────────────────────────────────────────────────
 
   Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.wifi_off_rounded, size: 48.sp, color: Colors.grey[400]),
-          SizedBox(height: 12.h),
-          AppText(
-            text: 'Could not load order details',
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[600]!,
+    return RefreshIndicator(
+      onRefresh: _fetchDetail,
+      color: AppColors.primarycolor,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.wifi_off_rounded,
+                  size: 48.sp,
+                  color: Colors.grey[400],
+                ),
+                SizedBox(height: 12.h),
+                AppText(
+                  text: 'Could not load order details',
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[600]!,
+                ),
+              ],
+            ),
           ),
-          SizedBox(height: 8.h),
-          TextButton.icon(
-            onPressed: _fetchDetail,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -423,7 +614,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Widget _buildContent(DeliveryOrder order) {
     final bool isCod = order.isCod;
     final bool isCompleted =
-        order.orderStatus == 'delivered' || order.orderStatus == 'cancelled';
+        order.orderStatus == 'delivered' ||
+        order.orderStatus == 'cancelled' ||
+        order.orderStatus == 'failed';
 
     return Column(
       children: [
@@ -508,6 +701,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       case 'cancelled':
       case 'failed':
       case 'rejected':
+      case 'undelivered':
         return const Color(0xFFFFE3E3);
       case 'shipped':
       case 'out_for_delivery':
@@ -533,6 +727,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       case 'cancelled':
       case 'failed':
       case 'rejected':
+      case 'undelivered':
         return const Color(0xFFDC2626);
       case 'shipped':
       case 'out_for_delivery':
@@ -674,7 +869,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ],
             ),
             SizedBox(height: 12.h),
-            if (_display.isInTransitStatus) ...[
+            if (_display.isInTransitStatus &&
+                !_display.orderStatus.toLowerCase().contains(
+                  'undelivered',
+                )) ...[
               Divider(color: Colors.grey[200]),
               SizedBox(height: 12.h),
               Row(
@@ -913,7 +1111,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       );
     }
 
-    // New Order - Still at Warehouse
+    // New Order - Pick up from source
     if (_display.isInNewStatus) {
       return Container(
         padding: EdgeInsets.all(16.w),
@@ -944,13 +1142,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.inventory_2_outlined,
+                      _display.isFromWarehouse
+                          ? Icons.inventory_2_outlined
+                          : Icons.local_shipping_outlined,
                       size: 20.sp,
                       color: Colors.white,
                     ),
                     SizedBox(width: 8.w),
                     AppText(
-                      text: 'Pick From Warehouse',
+                      text: _display.isFromWarehouse
+                          ? 'Pick From Warehouse'
+                          : 'Pick From Delivery Hub',
                       color: Colors.white,
                       fontSize: 15.sp,
                       fontWeight: FontWeight.w700,
@@ -960,6 +1162,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         ),
       );
     }
+
+    final isAlreadyUndelivered =
+        _display.orderStatus.toLowerCase() == 'undelivered';
+    final isWarehouseDropPending =
+        isAlreadyUndelivered &&
+        !_display.undeliveredWarehouseDrop &&
+        _display.isFromWarehouse;
 
     // In Transit - Delivery Actions
     return Container(
@@ -976,87 +1185,106 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: AppButton(
-              onPressed: _updatingStatus ? null : _reportFailedDelivery,
-              btncolor: Colors.white,
-              borderRadius: 8.r,
-              buttonStyle: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all(Colors.white),
-                side: WidgetStateProperty.all(
-                  const BorderSide(color: AppColors.errorMain),
-                ),
-                shape: WidgetStateProperty.all(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.r),
+          if (!isAlreadyUndelivered) ...[
+            Expanded(
+              child: AppButton(
+                onPressed: _updatingStatus ? null : _markUndelivered,
+                btncolor: Colors.white,
+                borderRadius: 8.r,
+                buttonStyle: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.all(Colors.white),
+                  side: WidgetStateProperty.all(
+                    const BorderSide(color: AppColors.errorMain),
                   ),
-                ),
-                elevation: WidgetStateProperty.all(0),
-              ),
-              child: AppText(
-                text: 'Cannot Deliver',
-                color: AppColors.errorMain,
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: AppButton(
-              onPressed: _uploading || _updatingStatus
-                  ? null
-                  : (_photoUploaded
-                        ? (_display.isCod && !_paymentCollected
-                              ? null
-                              : _deliverOrder)
-                        : _uploadPhoto),
-              btncolor: AppColors.primarycolor,
-              borderRadius: 8.r,
-              buttonStyle: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all(
-                  (_photoUploaded && _display.isCod && !_paymentCollected)
-                      ? Colors.grey
-                      : AppColors.primarycolor,
-                ),
-                shape: WidgetStateProperty.all(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                ),
-              ),
-              child: (_uploading || _updatingStatus)
-                  ? SizedBox(
-                      width: 20.w,
-                      height: 20.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _photoUploaded
-                              ? Icons.check_circle_outline
-                              : Icons.camera_alt_outlined,
-                          size: 16.sp,
-                          color: Colors.white,
-                        ),
-                        SizedBox(width: 6.w),
-                        AppText(
-                          text: _photoUploaded
-                              ? 'Deliver Order'
-                              : 'Upload Photo',
-                          color: Colors.white,
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ],
+                  shape: WidgetStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
                     ),
+                  ),
+                  elevation: WidgetStateProperty.all(0),
+                ),
+                child: AppText(
+                  text: 'Undelivered',
+                  color: AppColors.errorMain,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          ),
+            SizedBox(width: 12.w),
+          ],
+          if (isWarehouseDropPending) ...[
+            Expanded(
+              child: AppButton(
+                onPressed: _updatingStatus ? null : _markWarehouseDrop,
+                btncolor: AppColors.primarycolor,
+                borderRadius: 8.r,
+                child: AppText(
+                  text: 'Drop at Warehouse',
+                  color: Colors.white,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            SizedBox(width: 12.w),
+          ],
+          if (!isAlreadyUndelivered)
+            Expanded(
+              child: AppButton(
+                onPressed: _uploading || _updatingStatus
+                    ? null
+                    : (_photoUploaded
+                          ? (_display.isCod && !_paymentCollected
+                                ? null
+                                : _deliverOrder)
+                          : _uploadPhoto),
+                btncolor: AppColors.primarycolor,
+                borderRadius: 8.r,
+                buttonStyle: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.all(
+                    (_photoUploaded && _display.isCod && !_paymentCollected)
+                        ? Colors.grey
+                        : AppColors.primarycolor,
+                  ),
+                  shape: WidgetStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                  ),
+                ),
+                child: (_uploading || _updatingStatus)
+                    ? SizedBox(
+                        width: 20.w,
+                        height: 20.w,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _photoUploaded
+                                ? Icons.check_circle_outline
+                                : Icons.camera_alt_outlined,
+                            size: 16.sp,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 6.w),
+                          AppText(
+                            text: _photoUploaded
+                                ? 'Deliver Order'
+                                : 'Upload Photo',
+                            color: Colors.white,
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ],
+                      ),
+              ),
+            ),
         ],
       ),
     );

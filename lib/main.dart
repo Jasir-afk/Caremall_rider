@@ -2,7 +2,6 @@ import 'package:care_mall_rider/app/bindings/initial_binding.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/core/routes/app_routes.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
-import 'package:care_mall_rider/src/modules/intilise_screen/view/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -14,10 +13,10 @@ void main() async {
   await StorageService.init();
   runApp(const MyApp());
 }
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  @override
   Widget build(BuildContext context) {
     return ScreenUtilInit(
       designSize: const Size(375, 812), // Standard mobile design size
@@ -55,7 +54,6 @@ class MyApp extends StatelessWidget {
               InitialBinding(), // Automatically initializes global controllers
           initialRoute: AppPages.initial,
           getPages: AppPages.routes,
-          home: const SplashScreen(),
         );
       },
     );

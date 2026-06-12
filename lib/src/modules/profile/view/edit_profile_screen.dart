@@ -16,7 +16,6 @@ class EditProfileScreen extends StatefulWidget {
   final RiderProfile profile;
   const EditProfileScreen({super.key, required this.profile});
 
-  @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
@@ -52,7 +51,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'Truck',
   ];
 
-  @override
   void initState() {
     super.initState();
     final p = widget.profile;
@@ -72,7 +70,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _regCtrl = TextEditingController(text: p.registrationNumber);
   }
 
-  @override
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
@@ -233,7 +230,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         // Save new avatar URL if available in response
         final data = result['data'];
         if (data != null) {
-          final user = data['deliveryBoy'] ?? data['rider'] ?? data['user'] ?? data['data'];
+          final user =
+              data['deliveryBoy'] ??
+              data['rider'] ??
+              data['user'] ??
+              data['data'];
           if (user != null && user['avatar'] != null) {
             await StorageService.saveUserAvatar(user['avatar'].toString());
           }
@@ -260,7 +261,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
@@ -319,6 +319,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
                   ),
+                  SizedBox(height: 24.h),
+                  _buildDeleteAccountButton(),
+                  SizedBox(height: 40.h),
                 ]),
               ),
             ),
@@ -647,8 +650,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // ── Vehicle Section ───────────────────────────────────────────────────────
-
   Widget _buildVehicleSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -761,6 +762,114 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
     );
   }
+
+  // ── Delete Account Button ─────────────────────────────────────────────────────
+
+  Widget _buildDeleteAccountButton() {
+    return OutlinedButton(
+      onPressed: _loading ? null : _showDeleteConfirmation,
+      style: OutlinedButton.styleFrom(
+        minimumSize: Size(double.infinity, 56.h),
+        side: BorderSide(color: Colors.red.shade300, width: 1.5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+      ),
+      child: AppText(
+        text: 'Delete Account',
+        fontSize: 15.sp,
+        fontWeight: FontWeight.w600,
+        color: Colors.red.shade600,
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        title: AppText(
+          text: 'Delete Account?',
+          fontSize: 16.sp,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textnaturalcolor,
+        ),
+        content: AppText(
+          text:
+              'Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently removed.',
+          fontSize: 14.sp,
+          color: AppColors.textDefaultSecondarycolor,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: AppText(
+              text: 'Cancel',
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600] ?? Colors.grey,
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteAccount();
+            },
+            child: AppText(
+              text: 'Delete',
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.red.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    setState(() => _loading = true);
+    try {
+      final result = await ProfileRepo.deleteAccount();
+
+      if (result['success'] == true) {
+        // Clear all locally stored authentication data
+        await StorageService.clearAuthData();
+
+        // Show success message
+        if (mounted) {
+          AppSnackbar.showSuccess(
+            title: 'Account Deleted',
+            message:
+                result['message'] ??
+                'Your account has been deleted successfully.',
+          );
+
+          // Redirect to login/signup screen
+          Get.offAllNamed('/login');
+        }
+      } else {
+        if (mounted) {
+          AppSnackbar.showError(
+            title: 'Deletion Failed',
+            message: result['message'] ?? 'Failed to delete account.',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.showError(
+          title: 'Error',
+          message: 'Failed to delete account: $e',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 }
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
@@ -776,7 +885,6 @@ class _SectionCard extends StatelessWidget {
     required this.child,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
@@ -845,7 +953,6 @@ class _EditField extends StatelessWidget {
     this.hint,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -930,7 +1037,6 @@ class _ModeTab extends StatelessWidget {
     required this.onTap,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
@@ -970,7 +1076,6 @@ class _ModeTab extends StatelessWidget {
 // ─── Upper Case Formatter ─────────────────────────────────────────────────────
 
 class _UpperCaseFormatter extends TextInputFormatter {
-  @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,

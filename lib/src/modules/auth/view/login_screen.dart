@@ -1,85 +1,42 @@
 import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
-import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/app/utils/network/auth_service.dart';
 import 'package:care_mall_rider/app/utils/spaces.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
+import 'package:care_mall_rider/src/modules/auth/controller/auth_controller.dart';
 import 'package:care_mall_rider/src/modules/auth/view/otp_verification_screen.dart';
 import 'package:care_mall_rider/src/modules/auth/view/register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class LoginScreen extends GetView<AuthController> {
+  LoginScreen({super.key});
 
-  @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
-
-class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  bool _isLoading = false;
 
-  @override
-  void dispose() {
-    _phoneController.dispose();
-
-    super.dispose();
-  }
-
-  Future<void> _login() async {
+  void _login() {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      try {
-        final result = await AuthService.sendOtp(
-          phone: _phoneController.text,
-          mode: 'login',
-        );
-
-        if (mounted) {
-          if (result['success']) {
-            AppSnackbar.showSuccess(
-              title: 'OTP Sent',
-              message: result['message'],
-            );
-            // Navigate to OTP verification screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OTPVerificationScreen(
-                  phoneNumber: _phoneController.text,
-                  mode: 'login',
-                ),
-              ),
-            );
-          } else {
-            AppSnackbar.showError(
-              title: 'Login Failed',
-              message: result['message'],
-            );
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          AppSnackbar.showError(title: 'Error', message: e.toString());
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      }
+      controller.sendLoginOtp(
+        phone: _phoneController.text,
+        onSuccess: () {
+          Get.to(
+            () => OTPVerificationScreen(
+              phoneNumber: _phoneController.text,
+              mode: 'login',
+            ),
+          );
+        },
+        onAccountDeleted: (message) {
+          // Redirect to registration/signup flow
+          Get.to(() => RegisterScreen());
+        },
+      );
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -184,20 +141,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
 
                         defaultSpacer,
-                        AppButton(
-                          isLoading: _isLoading,
-                          child: AppText(
-                            text: "Send OTP",
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.whitecolor,
-                          ),
-                          onPressed: () {
-                            HapticFeedback.selectionClick();
-                            if (_formKey.currentState?.validate() ?? false) {
+                        Obx(
+                          () => AppButton(
+                            isLoading: controller.isLoading.value,
+                            child: AppText(
+                              text: "Send OTP",
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.whitecolor,
+                            ),
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
                               _login();
-                            }
-                          },
+                            },
+                          ),
                         ),
                         defaultSpacer,
 
@@ -206,14 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             Text("Don't have an account?"),
                             TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => RegisterScreen(),
-                                  ),
-                                );
-                              },
+                              onPressed: () => Get.to(() => RegisterScreen()),
                               child: Text(
                                 'Create New Account',
                                 style: TextStyle(

@@ -9,6 +9,7 @@ class DeliveryOrder {
   final ShippingAddress shippingAddress;
   final DispatchInfo? dispatch;
   final List<OrderItem> items;
+  final bool undeliveredWarehouseDrop;
   DeliveryOrder({
     required this.id,
     required this.orderId,
@@ -20,6 +21,7 @@ class DeliveryOrder {
     required this.shippingAddress,
     this.dispatch,
     this.items = const [],
+    this.undeliveredWarehouseDrop = false,
   });
 
   factory DeliveryOrder.fromJson(Map<String, dynamic> json) {
@@ -41,6 +43,7 @@ class DeliveryOrder {
       items: rawItems
           .map((e) => OrderItem.fromJson(e as Map<String, dynamic>))
           .toList(),
+      undeliveredWarehouseDrop: json['undeliveredWarehouseDrop'] ?? false,
     );
   }
 
@@ -79,10 +82,12 @@ class DeliveryOrder {
   bool get isInTransitStatus {
     const transitStatuses = {
       'shipped',
+      'shipping',
       'out_for_delivery',
       'in_transit',
       'in-transit',
       'picked_up',
+      'undelivered',
     };
     return transitStatuses.contains(orderStatus.toLowerCase());
   }
@@ -93,6 +98,14 @@ class DeliveryOrder {
   /// The amount that actually needs to be collected.
   /// If COD, add a 40 rupees charge.
   double get amountToCollect => isCod ? totalAmount + 40 : totalAmount;
+
+  /// Is this order assigned from a warehouse?
+  bool get isFromWarehouse =>
+      dispatch?.riderAssignedBy?.toLowerCase() == 'warehouse';
+
+  /// Is this order assigned from a delivery hub?
+  bool get isFromDeliveryHub =>
+      dispatch?.riderAssignedBy?.toLowerCase() == 'delivery_hub';
 }
 
 class OrderItem {
@@ -213,6 +226,7 @@ class DispatchInfo {
   final double amount;
   final String status;
   final DateTime? dispatchDate;
+  final String? riderAssignedBy;
 
   DispatchInfo({
     required this.dispatchType,
@@ -223,6 +237,7 @@ class DispatchInfo {
     required this.amount,
     required this.status,
     this.dispatchDate,
+    this.riderAssignedBy,
   });
 
   factory DispatchInfo.fromJson(Map<String, dynamic> json) {
@@ -237,6 +252,7 @@ class DispatchInfo {
       dispatchDate: json['dispatchDate'] != null
           ? DateTime.tryParse(json['dispatchDate'])
           : null,
+      riderAssignedBy: json['riderAssignedBy'],
     );
   }
 }

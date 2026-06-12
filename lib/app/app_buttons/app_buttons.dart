@@ -29,7 +29,6 @@ class AppButton extends StatelessWidget {
   final bool isLoading;
   final double borderRadius; // 👈 dynamic border radius
 
-  @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: width ?? ScreenUtil().screenWidth,

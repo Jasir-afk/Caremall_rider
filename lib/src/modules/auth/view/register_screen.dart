@@ -1,92 +1,44 @@
 import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
-import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/app/utils/network/auth_service.dart';
 import 'package:care_mall_rider/app/utils/spaces.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
+import 'package:care_mall_rider/src/modules/auth/controller/auth_controller.dart';
 import 'package:care_mall_rider/src/modules/auth/view/login_screen.dart';
 import 'package:care_mall_rider/src/modules/auth/view/otp_verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 
-class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+class RegisterScreen extends GetView<AuthController> {
+  RegisterScreen({super.key});
 
-  @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
-}
-
-class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  bool _isLoading = false;
 
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _emailCtrl.dispose();
-    _phoneCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _signup() async {
+  void _signup() {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      try {
-        final result = await AuthService.sendOtp(
-          phone: _phoneCtrl.text,
-          mode: 'signup',
-          name: _nameCtrl.text,
-          email: _emailCtrl.text,
-        );
-
-        if (mounted) {
-          if (result['success']) {
-            AppSnackbar.showSuccess(
-              title: 'OTP Sent',
-              message: result['message'],
-            );
-            // Navigate to OTP verification screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OTPVerificationScreen(
-                  phoneNumber: _phoneCtrl.text,
-                  mode: 'signup',
-                  name: _nameCtrl.text,
-                  email: _emailCtrl.text,
-                ),
-              ),
-            );
-          } else {
-            AppSnackbar.showError(
-              title: 'Registration Failed',
-              message: result['message'],
-            );
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          AppSnackbar.showError(title: 'Error', message: e.toString());
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      }
+      controller.sendSignupOtp(
+        phone: _phoneCtrl.text,
+        name: _nameCtrl.text,
+        email: _emailCtrl.text,
+        onSuccess: () {
+          Get.to(
+            () => OTPVerificationScreen(
+              phoneNumber: _phoneCtrl.text,
+              mode: 'signup',
+              name: _nameCtrl.text,
+              email: _emailCtrl.text,
+            ),
+          );
+        },
+      );
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
@@ -95,9 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Get.back(),
         ),
       ),
       body: SafeArea(
@@ -343,20 +293,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 defaultSpacer24,
 
                 // Sign Up Button
-                AppButton(
-                  isLoading: _isLoading,
-                  child: AppText(
-                    text: "Sign Up",
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.whitecolor,
-                  ),
-                  onPressed: () {
-                    HapticFeedback.selectionClick();
-                    if (_formKey.currentState?.validate() ?? false) {
+                Obx(
+                  () => AppButton(
+                    isLoading: controller.isLoading.value,
+                    child: AppText(
+                      text: "Sign Up",
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.whitecolor,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
                       _signup();
-                    }
-                  },
+                    },
+                  ),
                 ),
                 defaultSpacer,
 
@@ -368,10 +318,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: theme.textTheme.bodyMedium,
                     ),
                     TextButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      ),
+                      onPressed: () => Get.to(() => LoginScreen()),
                       child: Text(
                         'Login',
                         style: theme.textTheme.bodyMedium?.copyWith(

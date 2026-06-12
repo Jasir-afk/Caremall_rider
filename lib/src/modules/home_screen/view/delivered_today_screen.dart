@@ -9,14 +9,12 @@ import 'package:intl/intl.dart';
 class DeliveredTodayScreen extends StatefulWidget {
   const DeliveredTodayScreen({super.key});
 
-  @override
   State<DeliveredTodayScreen> createState() => _DeliveredTodayScreenState();
 }
 
 class _DeliveredTodayScreenState extends State<DeliveredTodayScreen> {
   late Future<DashboardModel> _future;
 
-  @override
   void initState() {
     super.initState();
     _future = OrderRepo.getDeliveredTodayData();
@@ -29,7 +27,6 @@ class _DeliveredTodayScreenState extends State<DeliveredTodayScreen> {
     await _future;
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
@@ -47,16 +44,6 @@ class _DeliveredTodayScreenState extends State<DeliveredTodayScreen> {
           fontWeight: FontWeight.w700,
           color: AppColors.textnaturalcolor,
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.refresh_rounded,
-              color: AppColors.primarycolor,
-              size: 22.sp,
-            ),
-            onPressed: _refresh,
-          ),
-        ],
       ),
       body: FutureBuilder<DashboardModel>(
         future: _future,
@@ -66,44 +53,41 @@ class _DeliveredTodayScreenState extends State<DeliveredTodayScreen> {
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: EdgeInsets.all(24.w),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 56.sp,
-                      color: Colors.grey[400],
-                    ),
-                    SizedBox(height: 16.h),
-                    AppText(
-                      text: 'Failed to load data',
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textnaturalcolor,
-                    ),
-                    SizedBox(height: 8.h),
-                    AppText(
-                      text: 'Check your connection and try again.',
-                      fontSize: 13.sp,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 24.h),
-                    ElevatedButton.icon(
-                      onPressed: _refresh,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primarycolor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
+            return RefreshIndicator(
+              onRefresh: () async => _refresh(),
+              color: AppColors.primarycolor,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.8,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.w),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.wifi_off_rounded,
+                            size: 56.sp,
+                            color: Colors.grey[400],
+                          ),
+                          SizedBox(height: 16.h),
+                          AppText(
+                            text: 'Failed to load data',
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textnaturalcolor,
+                          ),
+                          SizedBox(height: 8.h),
+                          AppText(
+                            text: 'Check your connection and try again.',
+                            fontSize: 13.sp,
+                            color: Colors.grey,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -206,7 +190,6 @@ class _SummaryCard extends StatelessWidget {
   final DashboardSummary summary;
   const _SummaryCard({required this.summary});
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -287,8 +270,6 @@ class _StatItem extends StatelessWidget {
     required this.value,
     required this.icon,
   });
-
-  @override
   Widget build(BuildContext context) {
     return Row(
       children: [
@@ -374,9 +355,9 @@ class _OrderCard extends StatelessWidget {
     }
   }
 
-  String get _statusLabel => order.orderStatus.replaceAll('_', ' ').toUpperCase();
+  String get _statusLabel =>
+      order.orderStatus.replaceAll('_', ' ').toUpperCase();
 
-  @override
   Widget build(BuildContext context) {
     final timeStr = order.deliveredAt != null
         ? DateFormat('hh:mm a').format(order.deliveredAt!.toLocal())

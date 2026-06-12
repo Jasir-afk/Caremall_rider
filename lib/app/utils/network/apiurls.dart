@@ -1,7 +1,11 @@
 class ApiUrls {
   // Base URL
-  static String baseURL = 'https://test.api.caremallonline.com';
+  //test
+  // static String baseURL = 'https://test.api.caremallonline.com';
+  //Live
+  static String baseURL = 'https://api.caremall.in';
   // static const String baseURL = 'http://192.168.1.5:3000';
+
   // Auth
   static String get sendOtp =>
       '$baseURL/api/v1/rider/auth/send-otp'; // POST – send OTP to rider
@@ -15,7 +19,6 @@ class ApiUrls {
       '$baseURL/api/v1/rider/auth/resend-otp'; // POST – resend OTP
   static String get logout =>
       '$baseURL/api/v1/rider/auth/logout'; // POST – logout rider
-
   // Kyc
   static String get kycSubmit =>
       '$baseURL/api/v1/rider/kyc/submit'; // POST – submit kyc
@@ -29,6 +32,8 @@ class ApiUrls {
   // Routes
   static String get todayRoute =>
       '$baseURL/api/v1/rider/routes/today'; // GET – today's route with ?lat=&lng=
+  static String get routeDistance =>
+      '$baseURL/api/v1/rider/routes/distance'; // GET – calculate route distance
 
   // Orders
   static String get deliveryOrders =>
@@ -61,6 +66,8 @@ class ApiUrls {
       '$baseURL/api/v1/rider/returns/$id/upload-photo'; // POST – upload return photo
   static String returnUpdateReplacementStatus(String id) =>
       '$baseURL/api/v1/rider/returns/$id/replacement-status'; // PATCH – update replacement delivery status
+  static String returnUpdateReplacementPickupStatus(String id) =>
+      '$baseURL/api/v1/rider/returns/$id/replacement-pickup-status'; // PATCH – update replacement pickup status
 
   // Wallet
   static String get wallet =>
@@ -75,4 +82,10 @@ class ApiUrls {
       '$baseURL/api/v1/rider/auth/me'; // GET – get rider profile
   static String get updateProfile =>
       '$baseURL/api/v1/rider/auth/me'; // PATCH – update rider profile
+  static String get deleteAccount =>
+      '$baseURL/api/v1/rider/account'; // DELETE – delete rider account
+  static String get onlineStatus =>
+      '$baseURL/api/v1/rider/auth/online-status'; // GET – get online status
+  static String get toggleOnlineStatus =>
+      '$baseURL/api/v1/rider/auth/online-status'; // PUT – toggle online status
 }

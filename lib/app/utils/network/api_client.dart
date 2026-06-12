@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 
 /// Base API client using GetConnect for handling HTTP requests
 class ApiClient extends GetConnect {
-  @override
   void onInit() {
     httpClient.baseUrl = ApiUrls.baseURL;
     httpClient.timeout = const Duration(seconds: 30);

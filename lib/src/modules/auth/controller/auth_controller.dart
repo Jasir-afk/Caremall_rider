@@ -1,6 +1,7 @@
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/src/modules/auth/controller/auth_repo.dart';
 import 'package:care_mall_rider/app/commenwidget/app_snackbar.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get_rx/src/rx_types/rx_types.dart';
 import 'package:get/get_state_manager/src/simple/get_controllers.dart';
 
@@ -17,8 +18,8 @@ class AuthController extends GetxController {
   final userEmail = ''.obs;
   final userAvatar = ''.obs;
   final authToken = ''.obs;
+  final isOnline = false.obs;
 
-  @override
   void onInit() {
     super.onInit();
     // Restore authentication state from persistent storage on startup
@@ -32,12 +33,19 @@ class AuthController extends GetxController {
     final savedName = await StorageService.getUserName();
     final savedEmail = await StorageService.getUserEmail();
     final savedAvatar = await StorageService.getUserAvatar();
+    final savedOnlineStatus = await StorageService.getOnlineStatus();
 
     if (savedToken != null) authToken.value = savedToken;
     if (savedPhone != null) phoneNumber.value = savedPhone;
     if (savedName != null) userName.value = savedName;
     if (savedEmail != null) userEmail.value = savedEmail;
     if (savedAvatar != null) userAvatar.value = savedAvatar;
+    if (savedOnlineStatus != null) isOnline.value = savedOnlineStatus;
+
+    // Fetch online status from server if user is logged in
+    if (authToken.value.isNotEmpty) {
+      await fetchOnlineStatus();
+    }
   }
 
   /// Sends OTP for login
@@ -46,10 +54,12 @@ class AuthController extends GetxController {
   /// - [phone]: 10-digit phone number
   /// - [onSuccess]: Callback function when OTP is sent successfully
   /// - [onError]: Callback function when there's an error
+  /// - [onAccountDeleted]: Callback function when account is deleted
   Future<void> sendLoginOtp({
     required String phone,
     Function? onSuccess,
     Function(String)? onError,
+    Function(String)? onAccountDeleted,
   }) async {
     isLoading.value = true;
 
@@ -61,8 +71,19 @@ class AuthController extends GetxController {
         AppSnackbar.showSuccess(title: 'Success', message: result['message']);
         if (onSuccess != null) onSuccess();
       } else {
-        AppSnackbar.showError(title: 'Error', message: result['message']);
-        if (onError != null) onError(result['message']);
+        // Check for account_deleted status
+        if (result['status'] == 'account_deleted') {
+          AppSnackbar.showError(
+            title: 'Account Deleted',
+            message:
+                result['message'] ??
+                'Your account has been deleted. Please create a new account to continue.',
+          );
+          if (onAccountDeleted != null) onAccountDeleted(result['message']);
+        } else {
+          AppSnackbar.showError(title: 'Error', message: result['message']);
+          if (onError != null) onError(result['message']);
+        }
       }
     } catch (e) {
       AppSnackbar.showError(
@@ -138,6 +159,12 @@ class AuthController extends GetxController {
 
     try {
       final result = await AuthRepo.verifyOtp(phone: phone, otp: otp);
+      if (kDebugMode) {
+        print("FULL RESPONSE: $result");
+      }
+      if (kDebugMode) {
+        print("TOKEN IS: ${result['token']}");
+      }
 
       if (result['success']) {
         // Save authentication token if provided
@@ -242,6 +269,7 @@ class AuthController extends GetxController {
     userEmail.value = '';
     userAvatar.value = '';
     authToken.value = '';
+    isOnline.value = false;
     isLoading.value = false;
     isResendingOtp.value = false;
     // Clear persistent storage
@@ -251,5 +279,66 @@ class AuthController extends GetxController {
   /// Check if user is currently logged in
   Future<bool> isLoggedIn() async {
     return await StorageService.isLoggedIn();
+  }
+
+  /// Fetches the rider's current online status from server
+  Future<void> fetchOnlineStatus() async {
+    if (authToken.value.isEmpty) return;
+
+    try {
+      final result = await AuthRepo.getOnlineStatus(token: authToken.value);
+
+      if (result['success'] && result['data'] != null) {
+        final bool serverOnlineStatus = result['data']['isOnline'] ?? false;
+        isOnline.value = serverOnlineStatus;
+        // Save to persistent storage
+        await StorageService.saveOnlineStatus(serverOnlineStatus);
+      }
+    } catch (e) {
+      // Silently fail - use cached status if fetch fails
+      if (kDebugMode) {
+        print('Failed to fetch online status: ${e.toString()}');
+      }
+    }
+  }
+
+  /// Toggles the rider's online status
+  ///
+  /// Parameters:
+  /// - [onSuccess]: Callback function when status is toggled successfully
+  /// - [onError]: Callback function when there's an error
+  Future<void> toggleOnlineStatus({
+    Function? onSuccess,
+    Function(String)? onError,
+  }) async {
+    isLoading.value = true;
+
+    try {
+      final result = await AuthRepo.toggleOnlineStatus(
+        isOnline: !isOnline.value,
+        token: authToken.value,
+      );
+
+      if (result['success']) {
+        // Update the online status
+        isOnline.value = !isOnline.value;
+        // Save to persistent storage
+        await StorageService.saveOnlineStatus(isOnline.value);
+
+        AppSnackbar.showSuccess(title: 'Success', message: result['message']);
+        if (onSuccess != null) onSuccess();
+      } else {
+        AppSnackbar.showError(title: 'Error', message: result['message']);
+        if (onError != null) onError(result['message']);
+      }
+    } catch (e) {
+      AppSnackbar.showError(
+        title: 'Error',
+        message: 'Failed to update status: ${e.toString()}',
+      );
+      if (onError != null) onError(e.toString());
+    } finally {
+      isLoading.value = false;
+    }
   }
 }

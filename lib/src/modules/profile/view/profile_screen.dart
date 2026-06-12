@@ -1,9 +1,6 @@
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
-import 'package:care_mall_rider/app/utils/kyc_storage.dart';
-import 'package:care_mall_rider/core/services/storage_service.dart';
-import 'package:care_mall_rider/src/modules/auth/view/login_screen.dart';
-import 'package:care_mall_rider/src/modules/profile/controller/profile_repo.dart';
+import 'package:care_mall_rider/src/modules/profile/controller/profile_controller.dart';
 import 'package:care_mall_rider/src/modules/profile/model/profile_model.dart';
 import 'package:care_mall_rider/src/modules/profile/view/edit_profile_screen.dart';
 import 'package:flutter/material.dart';
@@ -14,61 +11,16 @@ import 'package:get/get.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
-  @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  Future<RiderProfile>? _profileFuture;
+  late final ProfileController _profileController;
 
-  @override
   void initState() {
     super.initState();
-    _loadProfile();
-  }
-
-  void _loadProfile() {
-    setState(() {
-      _profileFuture = ProfileRepo.getProfile().then((json) async {
-        final data =
-            json['deliveryBoy'] ?? json['rider'] ?? json['data'] ?? json;
-        var profile = RiderProfile.fromJson(data as Map<String, dynamic>);
-
-        // Update local storage for fields that are present
-        StorageService.saveUserName(profile.name);
-        StorageService.saveUserAvatar(profile.avatar);
-        
-        if (profile.address.isNotEmpty) {
-          StorageService.saveUserAddress(profile.address);
-        } else {
-          // If server doesn't return an address, try to restore from local storage
-          final localAddress = await StorageService.getUserAddress();
-          if (localAddress != null && localAddress.isNotEmpty) {
-            profile = RiderProfile(
-              id: profile.id,
-              name: profile.name,
-              phone: profile.phone,
-              email: profile.email,
-              address: localAddress,
-              avatar: profile.avatar,
-              status: profile.status,
-              kycStatus: profile.kycStatus,
-              vehicleType: profile.vehicleType,
-              registrationNumber: profile.registrationNumber,
-              paymentMode: profile.paymentMode,
-              accountHolderName: profile.accountHolderName,
-              accountNumber: profile.accountNumber,
-              ifscCode: profile.ifscCode,
-              bankName: profile.bankName,
-              upiId: profile.upiId,
-              upiNumber: profile.upiNumber,
-            );
-          }
-        }
-
-        return profile;
-      });
-    });
+    _profileController = Get.find<ProfileController>();
+    _profileController.fetchProfile();
   }
 
   Future<void> _logout() async {
@@ -109,189 +61,189 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
 
-    if (confirmed != true) return;
-    await StorageService.clearAuthData();
-    await KycStorage.clearAll();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
+    if (confirmed == true) {
+      _profileController.logout();
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 250, 250, 255),
-      body: FutureBuilder<RiderProfile>(
-        future: _profileFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.error_outline, size: 48.sp, color: Colors.grey),
-                  SizedBox(height: 12.h),
-                  AppText(
-                    text: 'Could not load profile',
-                    fontSize: 14.sp,
-                    color: Colors.grey[600]!,
+      body: Obx(() {
+        if (_profileController.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (_profileController.errorMessage.value != null) {
+          return RefreshIndicator(
+            onRefresh: () => _profileController.fetchProfile(),
+            color: AppColors.primarycolor,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.8,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48.sp,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 12.h),
+                      AppText(
+                        text: 'Could not load profile',
+                        fontSize: 14.sp,
+                        color: Colors.grey[600]!,
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 12.h),
-                  TextButton.icon(
-                    onPressed: _loadProfile,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final profile = snapshot.data!;
-
-          return CustomScrollView(
-            slivers: [
-              // ── Hero Header ────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: _HeroHeader(
-                  profile: profile,
-                  onEdit: () async {
-                    final updated = await Get.to<bool>(
-                      () => EditProfileScreen(profile: profile),
-                    );
-                    if (updated == true) _loadProfile();
-                  },
                 ),
               ),
+            ),
+          );
+        }
 
-              // ── Content ────────────────────────────────────────────────
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 32.h),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    // Personal Details card
-                    _InfoCard(
-                      title: 'Personal Details',
-                      icon: SvgPicture.asset(
-                        'assets/icons/user.svg',
-                        colorFilter: const ColorFilter.mode(
-                          AppColors.primarycolor,
-                          BlendMode.srcIn,
-                        ),
-                        width: 18.w,
+        final profile = _profileController.profile.value;
+        if (profile == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        return CustomScrollView(
+          slivers: [
+            // ── Hero Header ────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: _HeroHeader(
+                profile: profile,
+                onEdit: () async {
+                  final updated = await Get.to<bool>(
+                    () => EditProfileScreen(profile: profile),
+                  );
+                  if (updated == true) _profileController.fetchProfile();
+                },
+              ),
+            ),
+
+            // ── Content ────────────────────────────────────────────────
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 32.h),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // Personal Details card
+                  _InfoCard(
+                    title: 'Personal Details',
+                    icon: SvgPicture.asset(
+                      'assets/icons/user.svg',
+                      colorFilter: const ColorFilter.mode(
+                        AppColors.primarycolor,
+                        BlendMode.srcIn,
                       ),
-                      rows: [
-                        _RowData(
-                          SvgPicture.asset(
-                            'assets/icons/phone.svg',
-                            width: 16.sp,
-                            colorFilter: const ColorFilter.mode(
-                              AppColors.primarycolor,
-                              BlendMode.srcIn,
-                            ),
+                      width: 18.w,
+                    ),
+                    rows: [
+                      _RowData(
+                        SvgPicture.asset(
+                          'assets/icons/phone.svg',
+                          width: 16.sp,
+                          colorFilter: const ColorFilter.mode(
+                            AppColors.primarycolor,
+                            BlendMode.srcIn,
                           ),
-                          'Phone',
-                          profile.phone,
                         ),
-                        _RowData(
-                          SvgPicture.asset(
-                            'assets/icons/mail.svg',
-                            width: 16.sp,
-                            colorFilter: const ColorFilter.mode(
-                              AppColors.primarycolor,
-                              BlendMode.srcIn,
-                            ),
+                        'Phone',
+                        profile.phone,
+                      ),
+                      _RowData(
+                        SvgPicture.asset(
+                          'assets/icons/mail.svg',
+                          width: 16.sp,
+                          colorFilter: const ColorFilter.mode(
+                            AppColors.primarycolor,
+                            BlendMode.srcIn,
                           ),
-                          'Email',
-                          profile.email.isEmpty ? '—' : profile.email,
                         ),
-                        _RowData(
-                          const Icon(
-                            Icons.location_on_outlined,
-                            size: 16,
+                        'Email',
+                        profile.email.isEmpty ? '—' : profile.email,
+                      ),
+                      _RowData(
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: AppColors.primarycolor,
+                        ),
+                        'Address',
+                        profile.address.isEmpty ? '—' : profile.address,
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 20.h),
+
+                  // KYC banner
+                  _StatusBanner(kycStatus: profile.kycStatus),
+
+                  SizedBox(height: 20.h),
+
+                  // Vehicle & Payment mini cards
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _MiniCard(
+                          icon: Icon(
+                            Icons.two_wheeler_rounded,
+                            size: 15.sp,
                             color: AppColors.primarycolor,
                           ),
-                          'Address',
-                          profile.address.isEmpty ? '—' : profile.address,
+                          title: 'Vehicle',
+                          lines: [
+                            profile.vehicleType,
+                            profile.registrationNumber.isEmpty
+                                ? '—'
+                                : profile.registrationNumber,
+                          ],
                         ),
-                      ],
-                    ),
-                    SizedBox(height: 20.h),
-
-                    // KYC banner
-                    _StatusBanner(kycStatus: profile.kycStatus),
-
-                    SizedBox(height: 20.h),
-
-                    // Vehicle & Payment mini cards
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _MiniCard(
-                            icon: Icon(
-                              Icons.two_wheeler_rounded,
-                              size: 15.sp,
-                              color: AppColors.primarycolor,
-                            ),
-                            title: 'Vehicle',
-                            lines: [
-                              profile.vehicleType,
-                              profile.registrationNumber.isEmpty
-                                  ? '—'
-                                  : profile.registrationNumber,
-                            ],
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: _MiniCard(
+                          icon: Icon(
+                            Icons.payments_rounded,
+                            size: 15.sp,
+                            color: AppColors.primarycolor,
                           ),
+                          title: 'Payment',
+                          lines: profile.paymentMode == 'bank'
+                              ? [
+                                  profile.bankName.isEmpty
+                                      ? 'BANK'
+                                      : profile.bankName,
+                                  profile.accountNumber.length > 4
+                                      ? '**** ${profile.accountNumber.substring(profile.accountNumber.length - 4)}'
+                                      : profile.accountNumber.isEmpty
+                                      ? '—'
+                                      : profile.accountNumber,
+                                ]
+                              : [
+                                  'UPI',
+                                  profile.upiNumber.isEmpty
+                                      ? '—'
+                                      : profile.upiNumber,
+                                ],
                         ),
-                        SizedBox(width: 12.w),
-                        Expanded(
-                          child: _MiniCard(
-                            icon: Icon(
-                              Icons.payments_rounded,
-                              size: 15.sp,
-                              color: AppColors.primarycolor,
-                            ),
-                            title: 'Payment',
-                            lines: profile.paymentMode == 'bank'
-                                ? [
-                                    profile.bankName.isEmpty
-                                        ? 'BANK'
-                                        : profile.bankName,
-                                    profile.accountNumber.length > 4
-                                        ? '**** ${profile.accountNumber.substring(profile.accountNumber.length - 4)}'
-                                        : profile.accountNumber.isEmpty
-                                        ? '—'
-                                        : profile.accountNumber,
-                                  ]
-                                : [
-                                    'UPI',
-                                    profile.upiNumber.isEmpty
-                                        ? '—'
-                                        : profile.upiNumber,
-                                  ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 28.h),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 28.h),
 
-                    // Logout
-                    _LogoutButton(onTap: _logout),
-                    SizedBox(height: 20.h),
-                  ]),
-                ),
+                  // Logout
+                  _LogoutButton(onTap: _logout),
+                  SizedBox(height: 20.h),
+                ]),
               ),
-            ],
-          );
-        },
-      ),
+            ),
+          ],
+        );
+      }),
     );
   }
 }
@@ -304,7 +256,6 @@ class _HeroHeader extends StatelessWidget {
 
   const _HeroHeader({required this.profile, required this.onEdit});
 
-  @override
   Widget build(BuildContext context) {
     return SafeArea(
       bottom: false,
@@ -394,15 +345,17 @@ class _HeroHeader extends StatelessWidget {
                     children: [
                       _Chip(
                         label: profile.status.toUpperCase(),
-                        color: AppColors.primarycolor.withValues(alpha: 0.1),
-                        textColor: AppColors.primarycolor,
+                        color: AppColors.textPositiveTertiarycolor.withValues(
+                          alpha: 0.1,
+                        ),
+                        textColor: AppColors.textPositiveTertiarycolor,
                       ),
-                      SizedBox(width: 8.w),
-                      _Chip(
-                        label: '⭐  Gold Rider',
-                        color: Colors.amber.withValues(alpha: 0.1),
-                        textColor: Colors.amber[800]!,
-                      ),
+                      // SizedBox(width: 8.w),
+                      // _Chip(
+                      //   label: '⭐  Gold Rider',
+                      //   color: Colors.amber.withValues(alpha: 0.1),
+                      //   textColor: Colors.amber[800]!,
+                      // ),
                     ],
                   ),
                 ],
@@ -424,7 +377,6 @@ class _Chip extends StatelessWidget {
 
   const _Chip({required this.label, required this.color, this.textColor});
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
@@ -462,7 +414,6 @@ class _InfoCard extends StatelessWidget {
     required this.rows,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -566,7 +517,6 @@ class _MiniCard extends StatelessWidget {
     required this.lines,
   });
 
-  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(14.w),
@@ -628,7 +578,6 @@ class _StatusBanner extends StatelessWidget {
 
   const _StatusBanner({required this.kycStatus});
 
-  @override
   Widget build(BuildContext context) {
     final (color, bg, icon, label) = switch (kycStatus.toLowerCase()) {
       'approved' => (
@@ -743,7 +692,6 @@ class _LogoutButton extends StatelessWidget {
 
   const _LogoutButton({required this.onTap});
 
-  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,

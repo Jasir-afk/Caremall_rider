@@ -13,7 +13,6 @@ import 'package:care_mall_rider/app/utils/kyc_storage.dart';
 class DrivingLicenseScreen extends StatefulWidget {
   const DrivingLicenseScreen({super.key});
 
-  @override
   State<DrivingLicenseScreen> createState() => _DrivingLicenseScreenState();
 }
 
@@ -29,7 +28,6 @@ class _DrivingLicenseScreenState extends State<DrivingLicenseScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-  @override
   void dispose() {
     _licenseNumberController.dispose();
     _dobController.dispose();
@@ -159,7 +157,6 @@ class _DrivingLicenseScreenState extends State<DrivingLicenseScreen> {
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -298,7 +295,6 @@ class _StepProgressBar extends StatelessWidget {
 
   const _StepProgressBar({required this.currentStep, required this.totalSteps});
 
-  @override
   Widget build(BuildContext context) {
     List<Widget> children = [];
 
@@ -359,7 +355,6 @@ class _ImageUploadBox extends StatelessWidget {
     required this.onTap,
   });
 
-  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
@@ -413,7 +408,6 @@ class _ImageUploadBox extends StatelessWidget {
 class _TipsCard extends StatelessWidget {
   const _TipsCard();
 
-  @override
   Widget build(BuildContext context) {
     const tips = [
       'Ensure all text is clearly visible',
