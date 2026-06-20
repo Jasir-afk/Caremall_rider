@@ -1,3 +1,4 @@
+import 'package:care_mall_rider/app/theme_data/app_colors.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
 import 'package:care_mall_rider/src/modules/auth/controller/auth_repo.dart';
 import 'package:care_mall_rider/src/modules/home_screen/controller/order_repo.dart';
@@ -266,7 +267,7 @@ class HomeController extends GetxController {
     // Show notification if there are new orders
     if (newlyAssignedOrders.isNotEmpty) {
       final count = newlyAssignedOrders.length;
-      Get.bottomSheet(
+      await Get.bottomSheet(
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -336,7 +337,9 @@ class HomeController extends GetxController {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () => Get.back(),
+                      onPressed: () {
+                        Get.back();
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF10B981),
@@ -347,7 +350,7 @@ class HomeController extends GetxController {
                         elevation: 0,
                       ),
                       child: const Text(
-                        'Got It',
+                        'Got it',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -378,19 +381,193 @@ class HomeController extends GetxController {
     }
   }
 
+  Future<void> checkForNewReturns(List<ReturnOrder> newReturns) async {
+    // Get existing return IDs from storage
+    final lastKnownReturnIds = await StorageService.getLastKnownReturnIds();
+    final existingReturnIdsSet = lastKnownReturnIds.toSet();
+
+    debugPrint('=== checkForNewReturns Debug ===');
+    debugPrint('Total new returns: ${newReturns.length}');
+    debugPrint('Last known return IDs from storage: $lastKnownReturnIds');
+
+    // Find returns that weren't in the previous list
+    final newlyAssignedReturns = newReturns.where((returnOrder) {
+      final isPreviouslyUnknown = !existingReturnIdsSet.contains(
+        returnOrder.id,
+      );
+      debugPrint(
+        'Return ${returnOrder.returnId} (id: ${returnOrder.id}): '
+        'isPreviouslyUnknown=$isPreviouslyUnknown, '
+        'isFromWarehouse=${returnOrder.isFromWarehouse}',
+      );
+      return isPreviouslyUnknown;
+    }).toList();
+
+    debugPrint('Newly assigned returns: ${newlyAssignedReturns.length}');
+
+    // Show notification if there are new returns
+    if (newlyAssignedReturns.isNotEmpty) {
+      final count = newlyAssignedReturns.length;
+      debugPrint('Showing bottom sheet for $count new returns');
+      await Get.bottomSheet(
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color.fromARGB(255, 255, 120, 120),
+                AppColors.primarycolor.withValues(alpha: 0.8),
+              ],
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle bar
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  // Icon with animation
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.assignment_return_rounded,
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Title
+                  Text(
+                    'New Return${count > 1 ? 's' : ''} Assigned!',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  // Message
+                  Text(
+                    count == 1
+                        ? 'You have a new return request:\n${newlyAssignedReturns.first.returnId}'
+                        : 'You have $count new return requests\nready for processing',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  // Action button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Get.back();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColors.primarycolor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Got it',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ),
+        ),
+        isDismissible: true,
+        enableDrag: true,
+        backgroundColor: Colors.transparent,
+      );
+
+      // Save updated return IDs to storage after showing notification
+      final allCurrentReturnIds = newReturns.map((r) => r.id).toList();
+      await StorageService.saveLastKnownReturnIds(allCurrentReturnIds);
+    } else {
+      // Even if no new returns, update storage with current return IDs
+      // to keep the stored list in sync
+      final allCurrentReturnIds = newReturns.map((r) => r.id).toList();
+      await StorageService.saveLastKnownReturnIds(allCurrentReturnIds);
+    }
+  }
+
   Future<void> _fetchReturnOrders(bool loadMore) async {
     try {
+      debugPrint('=== _fetchReturnOrders called ===');
+      debugPrint('loadMore: $loadMore');
+
       final returns = await ReturnRepo.getReturnOrders(
         page: currentPage.value,
         limit: pageSize,
       );
-      if (loadMore) {
-        returnOrders.addAll(returns);
-      } else {
-        returnOrders.assignAll(returns);
+
+      debugPrint('Fetched ${returns.length} returns');
+
+      // Fetch details for each return order in parallel to guarantee complete fields
+      final detailedReturns = await Future.wait(
+        returns.map((r) async {
+          try {
+            return await ReturnRepo.getReturnDetail(r.id);
+          } catch (e) {
+            debugPrint('Failed to fetch detail for return ${r.id}: $e');
+            return r;
+          }
+        }),
+      );
+
+      debugPrint('Detailed returns count: ${detailedReturns.length}');
+      for (var ret in detailedReturns) {
+        debugPrint(
+          'Return: ${ret.returnId}, isFromWarehouse: ${ret.isFromWarehouse}, status: ${ret.orderStatus}, itemStatus: ${ret.returnItemStatus}, isDropped: ${ret.isDropped}',
+        );
       }
-      hasMoreReturns.value = returns.length >= pageSize;
+
+      if (loadMore) {
+        returnOrders.addAll(detailedReturns);
+      } else {
+        returnOrders.assignAll(detailedReturns);
+        // Check for new returns only on initial load, not on load more
+        await checkForNewReturns(detailedReturns);
+      }
+      hasMoreReturns.value = detailedReturns.length >= pageSize;
     } catch (e) {
+      debugPrint('Error fetching returns: $e');
       returnsError.value = e.toString();
     }
   }
@@ -489,8 +666,17 @@ class HomeController extends GetxController {
   }
 
   // Getters for filtered orders
-  List<DeliveryOrder> get baseOrders =>
-      allOrdersForCounts.isNotEmpty ? allOrdersForCounts : allOrders;
+  List<DeliveryOrder> get baseOrders {
+    final list = allOrdersForCounts.isNotEmpty ? allOrdersForCounts : allOrders;
+    final sortedList = List<DeliveryOrder>.from(list);
+    sortedList.sort((a, b) {
+      if (a.createdAt != null && b.createdAt != null) {
+        return b.createdAt!.compareTo(a.createdAt!);
+      }
+      return b.id.compareTo(a.id);
+    });
+    return sortedList;
+  }
 
   List<DeliveryOrder> get newOrders => baseOrders
       .where((o) => newStatuses.contains(o.orderStatus.toLowerCase()))
@@ -508,44 +694,168 @@ class HomeController extends GetxController {
       .where((o) => historyStatuses.contains(o.orderStatus.toLowerCase()))
       .toList();
 
-  List<ReturnOrder> get activeReturnOrders => returnOrders.where((o) {
-    final status = o.orderStatus.toLowerCase();
-    final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
-      ' ',
-      '_',
-    );
-    final replStatus = o.replacementDeliveryStatus?.toLowerCase();
-    final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+  List<ReturnOrder> get activeReturnOrders {
+    final list = returnOrders.where((o) {
+      final status = o.orderStatus.toLowerCase();
+      final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+        ' ',
+        '_',
+      );
+      final replStatus = o.replacementDeliveryStatus?.toLowerCase();
+      final refundStatus = o.refundStatus?.toLowerCase();
+      final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+      final isFromWarehouse = o.isFromWarehouse;
 
-    if (status == 'rejected' && itemStatus != 'rejected_dropped') return true;
-    if (itemStatus == 'rejected_dropped') return false;
-    if (historyStatuses.contains(status)) return false;
-    if (isReplacement &&
-        (replStatus == 'completed' || replStatus == 'delivered'))
-      return false;
+      // Debug logging for completed replacement orders
+      if (isReplacement && status == 'completed') {
+        debugPrint('=== COMPLETED REPLACEMENT DEBUG ===');
+        debugPrint('Return ID: ${o.returnId}');
+        debugPrint('Status: $status');
+        debugPrint('Replacement Delivery Status: $replStatus');
+        debugPrint('Item Status: $itemStatus');
+        debugPrint('Is From Warehouse: $isFromWarehouse');
+        debugPrint('Is Dropped: ${o.isDropped}');
+        debugPrint('==================================');
+      }
 
-    return true;
-  }).toList();
+      // Terminal item-level check (highest priority)
+      // refund - rejected_dropped: rider is done → goes to History
+      if (!isReplacement && itemStatus == 'rejected_dropped') return false;
 
-  List<ReturnOrder> get historyReturnOrders => returnOrders.where((o) {
-    final status = o.orderStatus.toLowerCase();
-    final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
-      ' ',
-      '_',
-    );
-    final replStatus = o.replacementDeliveryStatus?.toLowerCase();
-    final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+      // replacement - rejected_dropped: rider is done → goes to History
+      if (isReplacement && itemStatus == 'rejected_dropped') return false;
 
-    if (status == 'rejected' && itemStatus == 'rejected_dropped') return true;
-    if (status == 'rejected') return false;
-    if (historyStatuses.contains(status)) return true;
-    if (itemStatus == 'rejected_dropped') return true;
-    if (isReplacement &&
-        (replStatus == 'completed' || replStatus == 'delivered'))
+      // replacement - completed: rider is done → goes to History
+      if (isReplacement && replStatus == 'completed') return false;
+
+      // replacement - delivered: rider is done → goes to History
+      if (isReplacement && replStatus == 'delivered') return false;
+
+      // refund - completed: rider is done → goes to History
+      if (!isReplacement && status == 'refund_completed') return false;
+
+      // Warehouse/Delivery Hub specific handling
+      // Warehouse-assigned: order status itself is reject_dropped → history
+      if (isFromWarehouse && status == 'reject_dropped') return false;
+
+      // Warehouse replacement dropped: stay active until replacement delivery is also completed
+      if (isFromWarehouse && o.isDropped && isReplacement) {
+        if (replStatus == 'completed' || replStatus == 'delivered') {
+          return false;
+        }
+        // fall through → remains active (phase 2 still needed)
+      }
+
+      // Order-level status checks
+      if (status == 'rejected') {
+        // If refund is completed, rider is done → goes to History
+        if (refundStatus == 'completed' ||
+            refundStatus == 'refunded' ||
+            refundStatus == 'success' ||
+            refundStatus == 'processed' ||
+            refundStatus == 'done') {
+          return false;
+        }
+        return true;
+      }
+
+      if (historyStatuses.contains(status)) {
+        if (isReplacement) {
+          // For replacement orders, move to history if:
+          // 1. Order status is completed/delivered, OR
+          // 2. Replacement delivery status is completed/delivered
+          if (status == 'completed' || status == 'delivered') {
+            return false; // Order itself is completed → goes to history
+          }
+          return !(replStatus == 'completed' || replStatus == 'delivered');
+        }
+        return false;
+      }
+
       return true;
+    }).toList();
 
-    return false;
-  }).toList();
+    list.sort((a, b) {
+      if (a.createdAt != null && b.createdAt != null) {
+        return b.createdAt!.compareTo(a.createdAt!);
+      }
+      return b.id.compareTo(a.id);
+    });
+    return list;
+  }
+
+  List<ReturnOrder> get historyReturnOrders {
+    final list = returnOrders.where((o) {
+      final status = o.orderStatus.toLowerCase();
+      final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+        ' ',
+        '_',
+      );
+      final replStatus = o.replacementDeliveryStatus?.toLowerCase();
+      final refundStatus = o.refundStatus?.toLowerCase();
+      final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+      final isFromWarehouse = o.isFromWarehouse;
+
+      // Terminal item-level check (highest priority)
+      // refund - rejected_dropped: rider done → History
+      if (!isReplacement && itemStatus == 'rejected_dropped') return true;
+
+      // replacement - rejected_dropped: rider done → History
+      if (isReplacement && itemStatus == 'rejected_dropped') return true;
+
+      // replacement - completed: rider done → History
+      if (isReplacement && replStatus == 'completed') return true;
+
+      // replacement - delivered: rider done → History
+      if (isReplacement && replStatus == 'delivered') return true;
+
+      // refund - completed: rider done → History
+      if (!isReplacement && status == 'refund_completed') return true;
+
+      // Warehouse/Delivery Hub specific handling
+      // Warehouse-assigned: order status itself is reject_dropped → history
+      if (isFromWarehouse && status == 'reject_dropped') return true;
+
+      // Warehouse replacement dropped: only in history when replacement delivery is completed
+      if (isFromWarehouse && o.isDropped && isReplacement) {
+        if (replStatus == 'completed' || replStatus == 'delivered') {
+          return true;
+        }
+        // fall through → not in history yet (phase 2 still needed)
+      }
+
+      // Rejected but refunded → rider done → History
+      if (status == 'rejected') {
+        if (refundStatus == 'completed' ||
+            refundStatus == 'refunded' ||
+            refundStatus == 'success' ||
+            refundStatus == 'processed' ||
+            refundStatus == 'done') {
+          return true;
+        }
+        // Rejected but not yet refunded → still active (not in History)
+        return false;
+      }
+
+      // Order-level terminal completed statuses
+      if (historyStatuses.contains(status)) {
+        if (isReplacement) {
+          return replStatus == 'completed' || replStatus == 'delivered';
+        }
+        return true;
+      }
+
+      return false;
+    }).toList();
+
+    list.sort((a, b) {
+      if (a.createdAt != null && b.createdAt != null) {
+        return b.createdAt!.compareTo(a.createdAt!);
+      }
+      return b.id.compareTo(a.id);
+    });
+    return list;
+  }
 
   List<DeliveryOrder> get todayCodOrders {
     final now = DateTime.now();

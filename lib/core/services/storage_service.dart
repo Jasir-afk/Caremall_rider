@@ -11,6 +11,7 @@ class StorageService {
   static const String _kycStatusKey = 'kyc_status';
   static const String _onlineStatusKey = 'online_status';
   static const String _lastKnownOrderIdsKey = 'last_known_order_ids';
+  static const String _lastKnownReturnIdsKey = 'last_known_return_ids';
 
   static SharedPreferences? _prefs;
 
@@ -157,6 +158,18 @@ class StorageService {
   static Future<List<String>> getLastKnownOrderIds() async {
     final prefs = await _instance;
     return prefs.getStringList(_lastKnownOrderIdsKey) ?? [];
+  }
+
+  /// Save last known return IDs
+  static Future<bool> saveLastKnownReturnIds(List<String> returnIds) async {
+    final prefs = await _instance;
+    return await prefs.setStringList(_lastKnownReturnIdsKey, returnIds);
+  }
+
+  /// Get last known return IDs
+  static Future<List<String>> getLastKnownReturnIds() async {
+    final prefs = await _instance;
+    return prefs.getStringList(_lastKnownReturnIdsKey) ?? [];
   }
 
   /// Clear all authentication data

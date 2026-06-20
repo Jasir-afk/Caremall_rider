@@ -189,22 +189,22 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
           final replStatus = detail.replacementDeliveryStatus?.toLowerCase();
           final isFromWarehouse = detail.isFromWarehouse;
 
-          // For warehouse-through-rider: allow from 'received' (rider assigned) onward
+          // For warehouse-through-rider: only allow Phase 2 after approval or rejection, NOT when status is 'requested'
           // For delivery hub: keep original behavior (allow from 'received' onward)
           if (isFromWarehouse) {
             _replacementAllowed =
                 detail.returnType?.toLowerCase() == 'replacement' &&
                 !isRejected &&
                 detail.isDropped &&
+                detail.orderStatus.toLowerCase() != 'requested' &&
                 (replStatus == 'received' ||
                     replStatus == 'picked' ||
                     replStatus == 'completed' ||
                     replStatus == 'delivered');
           } else {
-            // Delivery hub case: keep original behavior
+            // Delivery hub case: allow replacement delivery for rejected orders when status is 'received' or later
             _replacementAllowed =
                 detail.returnType?.toLowerCase() == 'replacement' &&
-                !isRejected &&
                 detail.isDropped &&
                 (replStatus == 'received' ||
                     replStatus == 'picked' ||
@@ -259,6 +259,17 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
       } else if (itemStatus == 'dropped' && ret.isFromWarehouse) {
         // Warehouse rejected: item dropped at warehouse, rider needs to pick up
         _returnMethod = 'pickup';
+      } else if (!ret.isFromWarehouse && replStatus != null) {
+        // Delivery hub rejected replacement: only allow when replStatus is 'received' or later
+        if (replStatus == 'received') {
+          _returnMethod = 'pickup'; // Can pick up from delivery hub
+        } else if (replStatus == 'picked' || _sourcePickConfirmed) {
+          _returnMethod = 'drop_off'; // Deliver to customer
+        } else if (replStatus == 'completed' || replStatus == 'delivered') {
+          _returnMethod = null; // Already delivered
+        } else {
+          _returnMethod = null; // Not yet received, wait
+        }
       } else {
         // Default to pickup for initial rejected state
         _returnMethod = 'pickup';
@@ -1558,13 +1569,13 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             // shows snackbar...
             _fetchDetail(); // re-fetches from server
           } else {
-            // final walletCredited =
-            //     result['walletCredited'] ?? result['data']?['walletCredited'];
-            // final walletBalance =
-            //     result['walletBalance'] ?? result['data']?['walletBalance'];
-            // final creditMsg = walletCredited != null
-            //     ? ' ₹$walletCredited credited to wallet (Balance: ₹$walletBalance).'
-            //     : '';
+            final walletCredited =
+                result['walletCredited'] ??
+                result['data']?['walletCredited'] ??
+                result['data']?['data']?['walletCredited'];
+            final creditedAmt = walletCredited != null
+                ? double.tryParse(walletCredited.toString())
+                : null;
             setState(() {
               _hasChanged = true;
               _detailsConfirmed = false;
@@ -1575,11 +1586,17 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
                 pickupStatus: 'item_delivered',
               );
             });
-            AppSnackbar.showSuccess(
-              title: 'Delivered!',
-              message: 'Replacement delivered to customer. Order complete!',
-              // $creditMsg',
-            );
+            if (creditedAmt != null && creditedAmt > 0) {
+              AppSnackbar.showEarnings(
+                amount: creditedAmt,
+                message: '${creditedAmt.toStringAsFixed(0)} rupees earned',
+              );
+            } else {
+              AppSnackbar.showSuccess(
+                title: 'Delivered!',
+                message: 'Replacement delivered to customer. Order complete!',
+              );
+            }
           }
           _fetchDetail();
         } else if (mounted) {
@@ -1645,11 +1662,25 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
 
       if (mounted) {
         if (result['success'] == true) {
-          AppSnackbar.showSuccess(
-            title: 'Success',
-            message:
-                'Status updated to ${itemStatus.replaceAll('_', ' ').toUpperCase()}!',
-          );
+          final walletCredited =
+              result['walletCredited'] ??
+              result['data']?['walletCredited'] ??
+              result['data']?['data']?['walletCredited'];
+          final creditedAmt = walletCredited != null
+              ? double.tryParse(walletCredited.toString())
+              : null;
+          if (creditedAmt != null && creditedAmt > 0) {
+            AppSnackbar.showEarnings(
+              amount: creditedAmt,
+              message: '${creditedAmt.toStringAsFixed(0)} rupees earned',
+            );
+          } else {
+            AppSnackbar.showSuccess(
+              title: 'Success',
+              message:
+                  'Status updated to ${itemStatus.replaceAll('_', ' ').toUpperCase()}!',
+            );
+          }
           _fetchDetail();
           _hasChanged = true;
           setState(() => _detailsConfirmed = false);

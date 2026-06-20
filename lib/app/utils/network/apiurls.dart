@@ -1,9 +1,9 @@
 class ApiUrls {
   // Base URL
   //test
-  // static String baseURL = 'https://test.api.caremallonline.com';
+  static String baseURL = 'https://test.api.caremallonline.com';
   //Live
-  static String baseURL = 'https://api.caremall.in';
+  //   static String baseURL = 'https://api.caremall.in';
   // static const String baseURL = 'http://192.168.1.5:3000';
 
   // Auth
