@@ -1,5 +1,6 @@
 import 'package:care_mall_rider/core/routes/app_routes.dart';
 import 'package:care_mall_rider/core/services/storage_service.dart';
+import 'package:care_mall_rider/core/services/update_service.dart';
 import 'package:care_mall_rider/gen/assets.gen.dart';
 import 'package:care_mall_rider/src/modules/kyc/controller/kyc_repo.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +35,18 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _navigate() async {
     await Future.delayed(const Duration(seconds: 3));
+
+    // Check for updates before checking user auth state
+    bool updateRequired = false;
+    if (mounted) {
+      updateRequired = await UpdateService.checkForUpdates(context);
+    }
+
+    // If update is required, don't navigate - the dialog will block the app
+    if (updateRequired) {
+      return;
+    }
+
     final isLoggedIn = await StorageService.isLoggedIn();
     if (!isLoggedIn) {
       // Not logged in → go to Login

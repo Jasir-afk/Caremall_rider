@@ -156,8 +156,8 @@ class LoginScreen extends GetView<AuthController> {
                             },
                           ),
                         ),
-                        defaultSpacer,
 
+                        defaultSpacer,
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [

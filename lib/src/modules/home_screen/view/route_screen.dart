@@ -358,16 +358,38 @@ Future<TodayRoute> fetchTodayRoute({
             'refund_completed',
             'returned',
             'refunded',
-            'return_completed',
+            'return_completed'
           };
+
+          // Warehouse-assigned: order status itself is reject_dropped → history
+          if (status == 'reject_dropped') return false;
+
+          // Non-replacement dropped (any source): rider is done → goes to History
+          if (!isReplacement && r.isDropped) return false;
+
+          // Warehouse replacement dropped: stay active until replacement delivery is also completed
+          if (r.isFromWarehouse && r.isDropped && isReplacement) {
+            final replStatus = r.replacementDeliveryStatus?.toLowerCase();
+            if (replStatus == 'completed' || replStatus == 'delivered') {
+              return false;
+            }
+            // fall through → remains active
+          }
+
+          // Warehouse through assign rider: when item status is rejected_dropped, move to history
+          if (itemStatus == 'rejected_dropped') return false;
 
           // Rejected but NOT yet dropped → still active
           if (status == 'rejected' && itemStatus != 'rejected_dropped') {
             return true;
           }
 
-          if (itemStatus == 'rejected_dropped') return false;
-          if (historyStatuses.contains(status)) return false;
+          if (historyStatuses.contains(status)) {
+            if (isReplacement) {
+              return !(replStatus == 'completed' || replStatus == 'delivered');
+            }
+            return false;
+          }
 
           // Replacement completed when delivered to customer
           if (isReplacement &&
@@ -377,7 +399,6 @@ Future<TodayRoute> fetchTodayRoute({
 
           return true;
         }).toList();
-
         for (final r in activeReturnOrders) {
           if (!existingRouteReturnIds.contains(r.returnId)) {
             syncedStops.add(

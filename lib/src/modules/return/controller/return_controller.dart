@@ -300,10 +300,12 @@ class ReturnController extends GetxController {
         );
         await fetchReturnDetail(returnId);
         // If wallet credited, show additional info
-        if (result['walletCredited'] == true) {
-          AppSnackbar.showSuccess(
-            title: 'Wallet Credited',
-            message: '₹${result['walletBalance'] ?? 0} added to your wallet',
+        final walletCredited = result['walletCredited'] ?? result['data']?['walletCredited'] ?? result['data']?['data']?['walletCredited'];
+        final creditedAmt = walletCredited != null ? double.tryParse(walletCredited.toString()) : null;
+        if (creditedAmt != null && creditedAmt > 0) {
+          AppSnackbar.showEarnings(
+            amount: creditedAmt,
+            message: '${creditedAmt.toStringAsFixed(0)} rupees earned',
           );
         }
       } else {

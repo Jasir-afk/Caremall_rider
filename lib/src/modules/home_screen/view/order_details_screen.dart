@@ -467,10 +467,24 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     if (mounted) setState(() => _updatingStatus = false);
 
     if (result['success'] == true) {
-      AppSnackbar.showSuccess(
-        title: 'Success',
-        message: 'Order delivered successfully!',
-      );
+      final walletCredited =
+          result['walletCredited'] ??
+          result['data']?['walletCredited'] ??
+          result['data']?['data']?['walletCredited'];
+      final creditedAmt = walletCredited != null
+          ? double.tryParse(walletCredited.toString())
+          : null;
+      if (creditedAmt != null && creditedAmt > 0) {
+        AppSnackbar.showEarnings(
+          amount: creditedAmt,
+          message: '${creditedAmt.toStringAsFixed(0)} rupees earned',
+        );
+      } else {
+        AppSnackbar.showSuccess(
+          title: 'Success',
+          message: 'Order delivered successfully!',
+        );
+      }
       _fetchDetail();
       _hasChanged = true;
       // Refresh wallet balance

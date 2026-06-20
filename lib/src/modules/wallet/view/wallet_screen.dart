@@ -572,168 +572,351 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   void _showWithdrawDialog(BuildContext context, WalletController controller) {
-    final amountController = TextEditingController();
     final wallet = controller.walletData.value;
-    final balance = wallet?.balance ?? 0.0;
+    final balance = (wallet?.balance ?? 0.0).toDouble();
 
     Get.bottomSheet(
-      Container(
-        padding: EdgeInsets.all(24.w),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40.w,
-                height: 4.h,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2.r),
-                ),
+      _WithdrawBottomSheet(
+        controller: controller,
+        balance: balance,
+      ),
+      isScrollControlled: true,
+    );
+  }
+}
+
+class _WithdrawBottomSheet extends StatefulWidget {
+  final WalletController controller;
+  final double balance;
+
+  const _WithdrawBottomSheet({
+    required this.controller,
+    required this.balance,
+  });
+
+
+  State<_WithdrawBottomSheet> createState() => _WithdrawBottomSheetState();
+}
+
+class _WithdrawBottomSheetState extends State<_WithdrawBottomSheet> {
+  late final TextEditingController amountController;
+  bool isSlideEnabled = false;
+
+  void initState() {
+    super.initState();
+    amountController = TextEditingController();
+    amountController.addListener(_updateSlideState);
+  }
+
+
+  void dispose() {
+    amountController.removeListener(_updateSlideState);
+    amountController.dispose();
+    super.dispose();
+  }
+
+  void _updateSlideState() {
+    final amountStr = amountController.text.trim();
+    if (amountStr.isEmpty) {
+      if (isSlideEnabled) {
+        setState(() {
+          isSlideEnabled = false;
+        });
+      }
+      return;
+    }
+    final amount = double.tryParse(amountStr);
+    final enabled = amount != null && amount > 0;
+    if (isSlideEnabled != enabled) {
+      setState(() {
+        isSlideEnabled = enabled;
+      });
+    }
+  }
+
+
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(24.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40.w,
+              height: 4.h,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2.r),
               ),
             ),
-            SizedBox(height: 20.h),
-            AppText(
-              text: 'Withdraw Funds',
-              fontSize: 20.sp,
-              fontWeight: FontWeight.w700,
+          ),
+          SizedBox(height: 20.h),
+          AppText(
+            text: 'Withdraw Funds',
+            fontSize: 20.sp,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textnaturalcolor,
+          ),
+          SizedBox(height: 8.h),
+          AppText(
+            text: 'Enter the amount you want to withdraw from your wallet.',
+            fontSize: 14.sp,
+            color: Colors.grey.shade600,
+          ),
+          SizedBox(height: 24.h),
+          Container(
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: AppColors.primarycolor.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12.r),
+              border: Border.all(
+                color: AppColors.primarycolor.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppText(
+                      text: 'Available Balance',
+                      fontSize: 12.sp,
+                      color: Colors.grey.shade600,
+                    ),
+                    AppText(
+                      text: '₹ ${widget.balance.toStringAsFixed(2)}',
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primarycolor,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 24.h),
+          TextField(
+            controller: amountController,
+            keyboardType: TextInputType.number,
+            style: TextStyle(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w600,
               color: AppColors.textnaturalcolor,
             ),
-            SizedBox(height: 8.h),
-            AppText(
-              text: 'Enter the amount you want to withdraw from your wallet.',
-              fontSize: 14.sp,
-              color: Colors.grey.shade600,
-            ),
-            SizedBox(height: 24.h),
-            Container(
-              padding: EdgeInsets.all(16.w),
-              decoration: BoxDecoration(
-                color: AppColors.primarycolor.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(
-                  color: AppColors.primarycolor.withValues(alpha: 0.1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(
-                        text: 'Available Balance',
-                        fontSize: 12.sp,
-                        color: Colors.grey.shade600,
-                      ),
-                      AppText(
-                        text: '₹ ${balance.toStringAsFixed(2)}',
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primarycolor,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 24.h),
-            TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              style: TextStyle(
+            decoration: InputDecoration(
+              hintText: '0.00',
+              prefixText: '₹ ',
+              prefixStyle: TextStyle(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textnaturalcolor,
               ),
-              decoration: InputDecoration(
-                hintText: '0.00',
-                prefixText: '₹ ',
-                prefixStyle: TextStyle(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textnaturalcolor,
-                ),
-                suffixIcon: TextButton(
-                  onPressed: () {
-                    amountController.text = balance.toStringAsFixed(2);
-                  },
-                  child: AppText(
-                    text: 'MAX',
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primarycolor,
-                  ),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: const BorderSide(color: AppColors.primarycolor),
-                ),
-              ),
-            ),
-            SizedBox(height: 32.h),
-            SizedBox(
-              width: double.infinity,
-              height: 52.h,
-              child: ElevatedButton(
+              suffixIcon: TextButton(
                 onPressed: () {
-                  final amountStr = amountController.text.trim();
-                  if (amountStr.isNotEmpty) {
-                    final amount = double.tryParse(amountStr);
-                    if (amount != null && amount > 0) {
-                      if (amount <= balance) {
-                        Get.back();
-                        controller.requestWithdrawal(amount);
-                      } else {
-                        AppSnackbar.showError(
-                          title: 'Insufficient Balance',
-                          message:
-                              'You cannot withdraw more than your available balance.',
-                        );
-                      }
-                    } else {
-                      AppSnackbar.showError(
-                        title: 'Invalid Amount',
-                        message: 'Please enter a valid amount to withdraw.',
-                      );
-                    }
-                  }
+                  amountController.text = widget.balance.toStringAsFixed(2);
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primarycolor,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                ),
                 child: AppText(
-                  text: 'Withdraw Now',
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  text: 'MAX',
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primarycolor,
                 ),
               ),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: BorderSide(color: Colors.grey.shade200),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: BorderSide(color: Colors.grey.shade200),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: const BorderSide(color: AppColors.primarycolor),
+              ),
             ),
-            SizedBox(height: 12.h),
-          ],
-        ),
+          ),
+          SizedBox(height: 32.h),
+          SlideToWithdraw(
+            text: 'Slide to Withdraw',
+            enabled: isSlideEnabled,
+            onSlideSuccess: () {
+              final amountStr = amountController.text.trim();
+              if (amountStr.isNotEmpty) {
+                final amount = double.tryParse(amountStr);
+                if (amount != null && amount > 0) {
+                  if (amount <= widget.balance) {
+                    Get.back();
+                    widget.controller.requestWithdrawal(amount);
+                  } else {
+                    AppSnackbar.showError(
+                      title: 'Insufficient Balance',
+                      message:
+                          'You cannot withdraw more than your available balance.',
+                    );
+                  }
+                } else {
+                  AppSnackbar.showError(
+                    title: 'Invalid Amount',
+                    message: 'Please enter a valid amount to withdraw.',
+                  );
+                }
+              } else {
+                AppSnackbar.showError(
+                  title: 'Amount Required',
+                  message: 'Please enter an amount to withdraw.',
+                );
+              }
+            },
+          ),
+          SizedBox(height: 12.h),
+        ],
       ),
-      isScrollControlled: true,
+    );
+  }
+}
+
+class SlideToWithdraw extends StatefulWidget {
+  final VoidCallback onSlideSuccess;
+  final String text;
+  final bool enabled;
+
+  const SlideToWithdraw({
+    super.key,
+    required this.onSlideSuccess,
+    this.text = 'Slide to Withdraw',
+    this.enabled = true,
+  });
+
+
+  State<SlideToWithdraw> createState() => _SlideToWithdrawState();
+}
+
+class _SlideToWithdrawState extends State<SlideToWithdraw> {
+  double _dragPosition = 0;
+  bool _isFinished = false;
+
+  void didUpdateWidget(covariant SlideToWithdraw oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled && oldWidget.enabled) {
+      setState(() {
+        _dragPosition = 0;
+      });
+    }
+  }
+
+  Widget build(BuildContext context) {
+    const double buttonHeight = 58.0;
+    const double thumbSize = 46.0;
+    const double padding = 6.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double maxDragDistance =
+            constraints.maxWidth - thumbSize - (padding * 2);
+
+        return Container(
+          width: constraints.maxWidth,
+          height: buttonHeight,
+          decoration: BoxDecoration(
+            color: widget.enabled ? AppColors.primarycolor : Colors.grey.shade300,
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Stack(
+            children: [
+              // Center text
+              Center(
+                child: Opacity(
+                  opacity: widget.enabled
+                      ? (1 - (_dragPosition / maxDragDistance)).clamp(0.2, 1.0)
+                      : 0.6,
+                  child: Text(
+                    widget.text,
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w700,
+                      color: widget.enabled ? AppColors.whitecolor : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+              // Drag handle
+              Positioned(
+                left: padding + _dragPosition,
+                top: padding,
+                child: GestureDetector(
+                  onHorizontalDragUpdate: widget.enabled
+                      ? (details) {
+                          if (_isFinished) return;
+                          setState(() {
+                            _dragPosition = (_dragPosition + details.delta.dx)
+                                .clamp(0.0, maxDragDistance);
+                          });
+                        }
+                      : null,
+                  onHorizontalDragEnd: widget.enabled
+                      ? (details) async {
+                          if (_isFinished) return;
+                          if (_dragPosition >= maxDragDistance * 0.9) {
+                            // Successful slide!
+                            setState(() {
+                              _dragPosition = maxDragDistance;
+                              _isFinished = true;
+                            });
+                            widget.onSlideSuccess();
+                            // Reset slide button after a short delay
+                            Future.delayed(const Duration(milliseconds: 600), () {
+                              if (mounted) {
+                                setState(() {
+                                  _dragPosition = 0;
+                                  _isFinished = false;
+                                });
+                              }
+                            });
+                          } else {
+                            // Snap back to starting position
+                            setState(() {
+                              _dragPosition = 0;
+                            });
+                          }
+                        }
+                      : null,
+                  child: Container(
+                    width: thumbSize,
+                    height: thumbSize,
+                    decoration: BoxDecoration(
+                      color: widget.enabled ? Colors.white : Colors.grey.shade100, // White rounded square thumb
+                      borderRadius: BorderRadius.circular(12.r),
+                      boxShadow: widget.enabled
+                          ? [
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 2),
+                                )
+                            ]
+                          : [],
+                    ),
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded, // Chevron/arrow matching user image
+                      color: widget.enabled ? const Color(0xFF1B3D2F) : Colors.grey.shade400,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
