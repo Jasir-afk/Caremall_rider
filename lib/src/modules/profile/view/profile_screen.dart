@@ -345,10 +345,14 @@ class _HeroHeader extends StatelessWidget {
                     children: [
                       _Chip(
                         label: profile.status.toUpperCase(),
-                        color: AppColors.textPositiveTertiarycolor.withValues(
-                          alpha: 0.1,
-                        ),
-                        textColor: AppColors.textPositiveTertiarycolor,
+                        color: profile.kycStatus.toLowerCase() == 'approved'
+                            ? AppColors.textPositiveTertiarycolor.withValues(
+                                alpha: 0.1,
+                              )
+                            : Colors.orange[700]!.withValues(alpha: 0.1),
+                        textColor: profile.kycStatus.toLowerCase() == 'approved'
+                            ? AppColors.textPositiveTertiarycolor
+                            : Colors.orange[700]!,
                       ),
                       // SizedBox(width: 8.w),
                       // _Chip(

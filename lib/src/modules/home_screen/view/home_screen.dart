@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:care_mall_rider/app/app_buttons/app_buttons.dart';
 import 'package:care_mall_rider/app/commenwidget/apptext.dart';
 import 'package:care_mall_rider/app/theme_data/app_colors.dart';
@@ -44,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _totalDeliveredToday = 0;
   // Pagination state
   int _currentPage = 1;
-  int _pageSize = 10;
+  final int _pageSize = 10;
   bool _hasMoreOrders = true;
   bool _hasMoreReturns = true;
   bool _loadingMore = false;
@@ -62,6 +64,11 @@ class _HomeScreenState extends State<HomeScreen> {
   // Search state
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+
+  // Background polling — silently re-fetches every 30 s so new assignments
+  // trigger the bottom sheet without any manual pull-to-refresh.
+  Timer? _pollingTimer;
+  bool _isSilentPolling = false; // guard against overlapping polls
 
   // Filter orders based on search query
   List<DeliveryOrder> _filterDeliveryOrders(List<DeliveryOrder> orders) {
@@ -90,6 +97,23 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUserData();
     _fetchOrders();
     _setupScrollListeners();
+    _startPolling();
+  }
+
+  /// Starts a background polling timer that silently re-fetches orders &
+  /// returns every 30 seconds. The bottom sheet is shown automatically when
+  /// a new assignment is detected by [checkForNewOrders] / [checkForNewReturns].
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (_isSilentPolling || !mounted) return;
+      _isSilentPolling = true;
+      try {
+        await _fetchOrders(silent: true);
+      } finally {
+        _isSilentPolling = false;
+      }
+    });
   }
 
   void _setupScrollListeners() {
@@ -119,6 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void dispose() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
     _deliveryScrollController.dispose();
     _historyScrollController.dispose();
     _returnScrollController.dispose();
@@ -140,10 +166,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _fetchOrders({bool loadMore = false}) async {
+  Future<void> _fetchOrders({bool loadMore = false, bool silent = false}) async {
     if (loadMore) {
       setState(() => _loadingMore = true);
-    } else {
+    } else if (!silent) {
+      // Only show loading spinners on non-silent (manual / initial) fetches
       setState(() {
         _ordersLoading = true;
         _ordersError = null;
@@ -186,18 +213,37 @@ class _HomeScreenState extends State<HomeScreen> {
             page: _currentPage,
             limit: _pageSize, // Use pagination for return orders
           )
-          .then((returns) {
+          .then((returns) async {
             debugPrint('=== RETURN ORDERS FETCH START ===');
             debugPrint('Fetched ${returns.length} return orders');
+
+            // Fetch details for each return order in parallel to guarantee complete fields
+            final detailedReturns = await Future.wait(
+              returns.map((r) async {
+                try {
+                  return await ReturnRepo.getReturnDetail(r.id);
+                } catch (e) {
+                  debugPrint('Failed to fetch detail for return ${r.id}: $e');
+                  return r;
+                }
+              }),
+            );
+
+            // Check for new returns and show bottom sheet using HomeController
+            if (!loadMore && Get.isRegistered<HomeController>()) {
+              final controller = Get.find<HomeController>();
+              await controller.checkForNewReturns(detailedReturns);
+            }
+
             debugPrint('=== RETURN ORDERS FETCH END ===');
             if (mounted) {
               setState(() {
                 if (loadMore) {
-                  _returnOrders.addAll(returns);
+                  _returnOrders.addAll(detailedReturns);
                 } else {
-                  _returnOrders = returns;
+                  _returnOrders = detailedReturns;
                 }
-                _hasMoreReturns = returns.length >= _pageSize;
+                _hasMoreReturns = detailedReturns.length >= _pageSize;
               });
             }
           })
@@ -339,8 +385,19 @@ class _HomeScreenState extends State<HomeScreen> {
     'return_completed',
   };
 
-  List<DeliveryOrder> get _baseOrders =>
-      _allOrdersForCounts.isNotEmpty ? _allOrdersForCounts : _allOrders;
+  List<DeliveryOrder> get _baseOrders {
+    final list = _allOrdersForCounts.isNotEmpty
+        ? _allOrdersForCounts
+        : _allOrders;
+    final sortedList = List<DeliveryOrder>.from(list);
+    sortedList.sort((a, b) {
+      if (a.createdAt != null && b.createdAt != null) {
+        return b.createdAt!.compareTo(a.createdAt!);
+      }
+      return b.id.compareTo(a.id);
+    });
+    return sortedList;
+  }
 
   List<DeliveryOrder> get _newOrders => _baseOrders
       .where((o) => _newStatuses.contains(o.orderStatus.toLowerCase()))
@@ -361,56 +418,164 @@ class _HomeScreenState extends State<HomeScreen> {
   List<DeliveryOrder> get _inTransitOrdersForCount => _inTransitOrders;
   List<DeliveryOrder> get _historyOrdersForCount => _historyOrders;
 
-  List<ReturnOrder> get _activeReturnOrders => _returnOrders.where((o) {
-    final status = o.orderStatus.toLowerCase();
-    final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
-      ' ',
-      '_',
-    );
-    final replStatus = o.replacementDeliveryStatus?.toLowerCase();
-    final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+  List<ReturnOrder> get _activeReturnOrders {
+    final list = _returnOrders.where((o) {
+      final status = o.orderStatus.toLowerCase();
+      final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+        ' ',
+        '_',
+      );
+      final replStatus = o.replacementDeliveryStatus?.toLowerCase();
+      final refundStatus = o.refundStatus?.toLowerCase();
+      final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+      final isFromWarehouse = o.isFromWarehouse;
 
-    // Rejected but NOT yet dropped → still active
-    if (status == 'rejected' && itemStatus != 'rejected_dropped') return true;
+      // ── Terminal item-level check (highest priority) ──────────────
+      // refund - rejected_dropped: rider is done → goes to History
+      if (!isReplacement && itemStatus == 'rejected_dropped') return false;
 
-    if (itemStatus == 'rejected_dropped') return false;
-    if (_historyStatuses.contains(status)) return false;
+      // replacement - rejected_dropped: rider is done → goes to History
+      if (isReplacement && itemStatus == 'rejected_dropped') return false;
 
-    // Replacement completed when delivered to customer
-    if (isReplacement &&
-        (replStatus == 'completed' || replStatus == 'delivered')) {
-      return false;
-    }
+      // replacement - completed: rider is done → goes to History
+      if (isReplacement && replStatus == 'completed') return false;
 
-    return true;
-  }).toList();
+      // replacement - delivered: rider is done → goes to History
+      if (isReplacement && replStatus == 'delivered') return false;
 
-  List<ReturnOrder> get _historyReturnOrders => _returnOrders.where((o) {
-    final status = o.orderStatus.toLowerCase();
-    final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
-      ' ',
-      '_',
-    );
-    final replStatus = o.replacementDeliveryStatus?.toLowerCase();
-    final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+      // refund - completed: rider is done → goes to History
+      if (!isReplacement && status == 'refund_completed') return false;
 
-    // Rejected: only move to history when rider has returned item to customer (rejected_dropped)
-    if (status == 'rejected' && itemStatus == 'rejected_dropped') return true;
-    // Rejected but not yet returned to customer → still active (not in history)
-    if (status == 'rejected') return false;
+      // ── Warehouse/Delivery Hub specific handling ─────────────────
+      // Warehouse-assigned: order status itself is reject_dropped → history
+      if (isFromWarehouse && status == 'reject_dropped') return false;
 
-    if (_historyStatuses.contains(status)) return true;
+      // Warehouse replacement dropped: stay active until replacement delivery is also completed
+      if (isFromWarehouse && o.isDropped && isReplacement) {
+        if (replStatus == 'completed' || replStatus == 'delivered') {
+          return false;
+        }
+        // fall through → remains active (phase 2 still needed)
+      }
 
-    if (itemStatus == 'rejected_dropped') return true;
+      // ── Order-level status checks ─────────────────────────────────
+      // Rejected but not yet refunded → still active
+      if (status == 'rejected') {
+        // If refund is completed, rider is done → goes to History
+        if (refundStatus == 'completed' ||
+            refundStatus == 'refunded' ||
+            refundStatus == 'success' ||
+            refundStatus == 'processed' ||
+            refundStatus == 'done') {
+          return false;
+        }
+        return true;
+      }
 
-    // Replacement completed when delivered to customer
-    if (isReplacement &&
-        (replStatus == 'completed' || replStatus == 'delivered')) {
+      if (_historyStatuses.contains(status)) {
+        if (isReplacement) {
+          // For replacement orders, move to history if:
+          // 1. Order status is completed/delivered, OR
+          // 2. Replacement delivery status is completed/delivered
+          if (status == 'completed' || status == 'delivered') {
+            return false; // Order itself is completed → goes to history
+          }
+          return !(replStatus == 'completed' || replStatus == 'delivered');
+        }
+        return false;
+      }
+
       return true;
-    }
+    }).toList();
 
-    return false;
-  }).toList();
+    list.sort((a, b) {
+      if (a.createdAt != null && b.createdAt != null) {
+        return b.createdAt!.compareTo(a.createdAt!);
+      }
+      return b.id.compareTo(a.id);
+    });
+    return list;
+  }
+
+  List<ReturnOrder> get _historyReturnOrders {
+    final list = _returnOrders.where((o) {
+      final status = o.orderStatus.toLowerCase();
+      final itemStatus = (o.returnItemStatus?.toLowerCase() ?? '').replaceAll(
+        ' ',
+        '_',
+      );
+      final replStatus = o.replacementDeliveryStatus?.toLowerCase();
+      final refundStatus = o.refundStatus?.toLowerCase();
+      final isReplacement = o.returnType?.toLowerCase() == 'replacement';
+      final isFromWarehouse = o.isFromWarehouse;
+
+      // ── Only completed / rider-done orders belong in History ──────
+
+      // refund - rejected_dropped: rider done → History
+      if (!isReplacement && itemStatus == 'rejected_dropped') return true;
+
+      // replacement - rejected_dropped: rider done → History
+      if (isReplacement && itemStatus == 'rejected_dropped') return true;
+
+      // replacement - completed: rider done → History
+      if (isReplacement && replStatus == 'completed') return true;
+
+      // replacement - delivered: rider done → History
+      if (isReplacement && replStatus == 'delivered') return true;
+
+      // refund - completed: rider done → History
+      if (!isReplacement && status == 'refund_completed') return true;
+
+      // ── Warehouse/Delivery Hub specific handling ─────────────────
+      // Warehouse-assigned: order status itself is reject_dropped → history
+      if (isFromWarehouse && status == 'reject_dropped') return true;
+
+      // Warehouse replacement dropped: only in history when replacement delivery is completed
+      if (isFromWarehouse && o.isDropped && isReplacement) {
+        if (replStatus == 'completed' || replStatus == 'delivered') {
+          return true;
+        }
+        // fall through → not in history yet (phase 2 still needed)
+      }
+
+      // Rejected but refunded → rider done → History
+      if (status == 'rejected') {
+        if (refundStatus == 'completed' ||
+            refundStatus == 'refunded' ||
+            refundStatus == 'success' ||
+            refundStatus == 'processed' ||
+            refundStatus == 'done') {
+          return true;
+        }
+        // Rejected but not yet refunded → still active (not in History)
+        return false;
+      }
+
+      // Order-level terminal completed statuses
+      if (_historyStatuses.contains(status)) {
+        if (isReplacement) {
+          // For replacement orders, move to history if:
+          // 1. Order status is completed/delivered, OR
+          // 2. Replacement delivery status is completed/delivered
+          if (status == 'completed' || status == 'delivered') {
+            return true; // Order itself is completed → goes to history
+          }
+          return replStatus == 'completed' || replStatus == 'delivered';
+        }
+        return true;
+      }
+
+      return false;
+    }).toList();
+
+    list.sort((a, b) {
+      if (a.createdAt != null && b.createdAt != null) {
+        return b.createdAt!.compareTo(a.createdAt!);
+      }
+      return b.id.compareTo(a.id);
+    });
+    return list;
+  }
 
   /// Today's delivered COD orders for breakdown
   List<DeliveryOrder> get _todayCodOrders {
@@ -1044,14 +1209,14 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.wifi_off_rounded,
-                    size: 48.sp,
-                    color: Colors.grey[400],
-                  ),
-                  SizedBox(height: 12.h),
+                  // Icon(
+                  //   Icons.wifi_off_rounded,
+                  //   size: 48.sp,
+                  //   color: Colors.grey[400],
+                  // ),
+                  // SizedBox(height: 12.h),
                   AppText(
-                    text: 'Could not load orders',
+                    text: 'No orders here',
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w500,
                     color: Colors.grey[600]!,
@@ -1449,9 +1614,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(width: 16.w),
                 Expanded(
                   child: () {
-                    final bool isRejected = ret.orderStatus
-                        .toLowerCase()
-                        .contains('rejected');
                     final String itemStatusClean =
                         (ret.returnItemStatus?.toLowerCase() ?? '').replaceAll(
                           ' ',
@@ -1459,20 +1621,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
 
                     final bool isCompleted =
-                        // Rejected orders: only complete when rider has returned item to customer
-                        (isRejected && itemStatusClean == 'rejected_dropped') ||
-                        // Normal (non-rejected) refund/replacement orders
-                        (!isRejected &&
-                            _historyStatuses.contains(
-                              ret.orderStatus.toLowerCase(),
-                            )) ||
-                        // Replacement: completed when replacementDeliveryStatus is 'completed' or 'delivered'
-                        // Note: 'received' now means picker picked from hub (intermediate step)
+                        itemStatusClean == 'rejected_dropped' ||
+                        // Refund completed → rider done
+                        (ret.refundStatus?.toLowerCase() == 'completed' ||
+                            ret.refundStatus?.toLowerCase() == 'refunded' ||
+                            ret.refundStatus?.toLowerCase() == 'success' ||
+                            ret.refundStatus?.toLowerCase() == 'processed' ||
+                            ret.refundStatus?.toLowerCase() == 'done') ||
+                        // Replacement: only show as done when replacement delivery completed
                         (ret.returnType?.toLowerCase() == 'replacement' &&
                             (ret.replacementDeliveryStatus?.toLowerCase() ==
                                     'completed' ||
                                 ret.replacementDeliveryStatus?.toLowerCase() ==
-                                    'delivered'));
+                                    'delivered')) ||
+                        _historyStatuses.contains(
+                          ret.orderStatus.toLowerCase(),
+                        );
 
                     if (isCompleted) {
                       final bool showAsRejectedDropped =
@@ -1550,9 +1714,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         child: AppText(
-                          text: isRejected
-                              ? 'Start Refund'
-                              : ret.returnType?.toLowerCase() == 'replacement'
+                          text: ret.returnType?.toLowerCase() == 'replacement'
                               ? 'Start Replacement'
                               : 'Start Refund',
                           fontSize: 13.sp,

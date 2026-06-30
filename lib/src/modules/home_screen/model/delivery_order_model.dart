@@ -10,6 +10,8 @@ class DeliveryOrder {
   final DispatchInfo? dispatch;
   final List<OrderItem> items;
   final bool undeliveredWarehouseDrop;
+  final DateTime? createdAt;
+
   DeliveryOrder({
     required this.id,
     required this.orderId,
@@ -22,6 +24,7 @@ class DeliveryOrder {
     this.dispatch,
     this.items = const [],
     this.undeliveredWarehouseDrop = false,
+    this.createdAt,
   });
 
   factory DeliveryOrder.fromJson(Map<String, dynamic> json) {
@@ -34,7 +37,7 @@ class DeliveryOrder {
       paymentMethod: json['paymentMethod'] ?? '',
       isDelivered: json['isDelivered'] ?? false,
       deliveredAt: json['deliveredAt'] != null
-          ? DateTime.tryParse(json['deliveredAt'])
+          ? DateTime.tryParse(json['deliveredAt'].toString())
           : null,
       shippingAddress: ShippingAddress.fromJson(json['shippingAddress'] ?? {}),
       dispatch: json['dispatch'] != null
@@ -44,6 +47,9 @@ class DeliveryOrder {
           .map((e) => OrderItem.fromJson(e as Map<String, dynamic>))
           .toList(),
       undeliveredWarehouseDrop: json['undeliveredWarehouseDrop'] ?? false,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
     );
   }
 

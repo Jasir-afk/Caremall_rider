@@ -38,6 +38,58 @@ class AppSnackbar {
     );
   }
 
+  /// Displays a minimal earnings/credits snackbar with a wallet icon.
+  static void showEarnings({required double amount, String? message}) {
+    Get.closeAllSnackbars();
+    Get.rawSnackbar(
+      titleText: Text(
+        '₹${amount.toStringAsFixed(2)} Earned',
+        style: TextStyle(
+          fontSize: 15.sp,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textnaturalcolor,
+        ),
+      ),
+      messageText: Text(
+        message ?? '${amount.toStringAsFixed(0)} rupees earned',
+        style: TextStyle(
+          fontSize: 13.sp,
+          fontWeight: FontWeight.w500,
+          color: Colors.black87,
+        ),
+      ),
+      icon: Padding(
+        padding: EdgeInsets.only(left: 14.w),
+        child: Icon(
+          Icons.account_balance_wallet_rounded,
+          color: const Color(0xFF10B981), // Clean success green
+          size: 26.sp,
+        ),
+      ),
+      shouldIconPulse: false,
+      backgroundColor: Colors.white,
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
+      borderRadius: 12.r,
+      borderColor: const Color(0xFF10B981).withValues(alpha: 0.3),
+      borderWidth: 1.5,
+      boxShadows: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.08),
+          blurRadius: 15,
+          offset: const Offset(0, 5),
+        ),
+      ],
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 4),
+      animationDuration: const Duration(milliseconds: 300),
+      isDismissible: true,
+      forwardAnimationCurve: Curves.easeOutBack,
+      reverseAnimationCurve: Curves.easeIn,
+    );
+  }
+
+
   /// Internal method to show consistent styled GetX snackbars
   static void _showSnackbar({
     required String title,
