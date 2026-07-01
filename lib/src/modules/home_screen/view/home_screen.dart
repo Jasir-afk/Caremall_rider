@@ -155,15 +155,59 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         }),
       );
+
+      // Extract refund_requested delivery orders and merge them into return orders check
+      final refundRequestedFromDelivery = orders
+          .where((o) {
+            final s = o.orderStatus.toLowerCase();
+            return s == 'refund_requested' ||
+                s == 'refund requested' ||
+                s == 'refund_request' ||
+                s == 'refund request' ||
+                s == 'return_requested' ||
+                s == 'return requested' ||
+                s == 'return_request' ||
+                s == 'return request';
+          })
+          .map((o) => ReturnOrder.fromDeliveryOrder(o))
+          .toList();
+
+      final allDetailedReturns = [...detailedReturns];
+      for (final r in refundRequestedFromDelivery) {
+        if (!allDetailedReturns.any((existing) => existing.id == r.id)) {
+          allDetailedReturns.add(r);
+        }
+      }
+
       if (mounted) {
         newReturnsCount = await controller.checkForNewReturns(
-          detailedReturns,
+          allDetailedReturns,
           skipNotification: true,
         );
       }
 
       // 3. If any new details arrived, show single combined bottomsheet and auto-refresh
       if ((newOrdersCount > 0 || newReturnsCount > 0) && mounted) {
+        // If a bottom sheet is already open, skip showing combined notification and do NOT write to storage yet
+        if (_isShowingNotificationBottomSheet || Get.isBottomSheetOpen == true) {
+          debugPrint(
+            'A bottom sheet is already open or opening. Skipping combined notification, will retry next poll.',
+          );
+          return;
+        }
+
+        // Save updated order IDs to storage immediately since we are displaying the bottom sheet
+        final allCurrentOrderIds = orders.map((o) => o.id).toList();
+        final lastKnownOrderIds = await StorageService.getLastKnownOrderIds();
+        final updatedOrderIds = {...lastKnownOrderIds, ...allCurrentOrderIds}.toList();
+        await StorageService.saveLastKnownOrderIds(updatedOrderIds);
+        
+        // Save updated return IDs to storage immediately since we are displaying the bottom sheet
+        final allCurrentReturnIds = allDetailedReturns.map((r) => r.id).toList();
+        final lastKnownReturnIds = await StorageService.getLastKnownReturnIds();
+        final updatedReturnIds = {...lastKnownReturnIds, ...allCurrentReturnIds}.toList();
+        await StorageService.saveLastKnownReturnIds(updatedReturnIds);
+
         debugPrint(
           'New incoming details detected! Showing combined notification.',
         );
@@ -389,16 +433,6 @@ class _HomeScreenState extends State<HomeScreen> {
       OrderRepo.getDeliveryOrders(page: _currentPage, limit: _pageSize)
           .then((orders) {
             if (mounted) {
-              // Check for new orders and notify rider using HomeController
-              // Skip notification on silent refresh — it was already shown by _silentRefreshIncoming
-              if (!loadMore && !silent && Get.isRegistered<HomeController>()) {
-                final controller = Get.find<HomeController>();
-                controller.checkForNewOrders(
-                  orders,
-                  existingOrders: _allOrders,
-                );
-              }
-
               setState(() {
                 if (loadMore) {
                   _allOrders.addAll(orders);
@@ -432,13 +466,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
               }),
             );
-
-            // Check for new returns and show bottom sheet using HomeController
-            // Skip notification on silent refresh — it was already shown by _silentRefreshIncoming
-            if (!loadMore && !silent && Get.isRegistered<HomeController>()) {
-              final controller = Get.find<HomeController>();
-              await controller.checkForNewReturns(detailedReturns);
-            }
 
             debugPrint('=== RETURN ORDERS FETCH END ===');
             if (mounted) {
@@ -566,6 +593,15 @@ class _HomeScreenState extends State<HomeScreen> {
             _historyOrders.length + _historyReturnOrders.length;
         _visibleReturnCount = _activeReturnOrders.length;
       });
+
+      // Check for new assignments sequentially at the very end of the manual fetch
+      if (!loadMore && !silent && Get.isRegistered<HomeController>()) {
+        final controller = Get.find<HomeController>();
+        // 1. Check for new orders
+        await controller.checkForNewOrders(_allOrders);
+        // 2. Check for new returns (using _returnOrders which now includes the merged refund-requested delivery orders)
+        await controller.checkForNewReturns(_returnOrders);
+      }
     }
   }
 
