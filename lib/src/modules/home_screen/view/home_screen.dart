@@ -50,11 +50,14 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasMoreOrders = true;
   bool _hasMoreReturns = true;
   bool _loadingMore = false;
-  // Client-side visible count per tab (10 per page)
+  // Client-side visible count per tab - increases dynamically with more orders
   static const int _pageLimit = 10;
   int _visibleNewCount = _pageLimit;
   int _visibleHistoryCount = _pageLimit;
   int _visibleReturnCount = _pageLimit;
+  Timer? _pollingTimer;
+  bool _isSilentPolling = false;
+  bool _isShowingNotificationBottomSheet = false;
   // Scroll controllers
   final ScrollController _deliveryScrollController = ScrollController();
   final ScrollController _historyScrollController = ScrollController();
@@ -65,10 +68,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
-  // Background polling — silently re-fetches every 30 s so new assignments
-  // trigger the bottom sheet without any manual pull-to-refresh.
-  Timer? _pollingTimer;
-  bool _isSilentPolling = false; // guard against overlapping polls
+  // Incoming-orders refresh — polls every 30 s and silently updates only
+  // new/incoming order counts and info. Does NOT refresh returns or stats.
 
   // Filter orders based on search query
   List<DeliveryOrder> _filterDeliveryOrders(List<DeliveryOrder> orders) {
@@ -92,28 +93,223 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
+  @override
   void initState() {
     super.initState();
     _loadUserData();
-    _fetchOrders();
+    _fetchOrders(); // full initial load (orders + returns + stats + bottom sheet)
     _setupScrollListeners();
-    _startPolling();
+    _startIncomingPolling(); // auto-refresh incoming orders
   }
 
-  /// Starts a background polling timer that silently re-fetches orders &
-  /// returns every 30 seconds. The bottom sheet is shown automatically when
-  /// a new assignment is detected by [checkForNewOrders] / [checkForNewReturns].
-  void _startPolling() {
+  /// Polls every 30 seconds to check for new assignments silently.
+  /// If a new assignment is found, the bottom sheet is shown and a full
+  /// auto-refresh is triggered once to update all lists, counts, and stats.
+  void _startIncomingPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (_isSilentPolling || !mounted) return;
       _isSilentPolling = true;
       try {
-        await _fetchOrders(silent: true);
+        await _silentRefreshIncoming();
       } finally {
         _isSilentPolling = false;
       }
     });
+  }
+
+  /// Silently fetches page-1 of delivery and return orders to check for new ones.
+  /// If new details are detected, triggers _fetchOrders() to auto-refresh the UI once.
+  Future<void> _silentRefreshIncoming() async {
+    try {
+      if (!Get.isRegistered<HomeController>()) return;
+      final controller = Get.find<HomeController>();
+
+      int newOrdersCount = 0;
+      int newReturnsCount = 0;
+
+      // 1. Silent fetch and check delivery orders (skip notification)
+      final orders = await OrderRepo.getDeliveryOrders(
+        page: 1,
+        limit: _pageSize,
+      );
+      if (mounted) {
+        newOrdersCount = await controller.checkForNewOrders(
+          orders,
+          existingOrders: _allOrders,
+          skipNotification: true,
+        );
+      }
+
+      // 2. Silent fetch and check return orders (skip notification)
+      final returns = await ReturnRepo.getReturnOrders(
+        page: 1,
+        limit: _pageSize,
+      );
+      final detailedReturns = await Future.wait(
+        returns.map((r) async {
+          try {
+            return await ReturnRepo.getReturnDetail(r.id);
+          } catch (_) {
+            return r;
+          }
+        }),
+      );
+      if (mounted) {
+        newReturnsCount = await controller.checkForNewReturns(
+          detailedReturns,
+          skipNotification: true,
+        );
+      }
+
+      // 3. If any new details arrived, show single combined bottomsheet and auto-refresh
+      if ((newOrdersCount > 0 || newReturnsCount > 0) && mounted) {
+        debugPrint(
+          'New incoming details detected! Showing combined notification.',
+        );
+        await _showCombinedNewOrdersBottomSheet(
+          newOrdersCount,
+          newReturnsCount,
+        );
+        // Use silent=true so the UI updates without loading spinners
+        await _fetchOrders(silent: true);
+      }
+    } catch (e) {
+      debugPrint('Incoming orders silent check error: $e');
+    }
+  }
+
+  /// Show a single combined bottomsheet for new orders and returns
+  Future<void> _showCombinedNewOrdersBottomSheet(
+    int newOrdersCount,
+    int newReturnsCount,
+  ) async {
+    if (_isShowingNotificationBottomSheet || Get.isBottomSheetOpen == true) {
+      debugPrint(
+        'A bottom sheet is already open or opening. Skipping combined notification.',
+      );
+      return;
+    }
+    _isShowingNotificationBottomSheet = true;
+
+    final totalNew = newOrdersCount + newReturnsCount;
+    final message = newOrdersCount > 0 && newReturnsCount > 0
+        ? 'You have $newOrdersCount new delivery order${newOrdersCount > 1 ? 's' : ''} and $newReturnsCount new return${newReturnsCount > 1 ? 's' : ''} assigned'
+        : newOrdersCount > 0
+        ? 'You have $newOrdersCount new delivery order${newOrdersCount > 1 ? 's' : ''} assigned'
+        : 'You have $newReturnsCount new return${newReturnsCount > 1 ? 's' : ''} assigned';
+
+    await Get.bottomSheet(
+      Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: newReturnsCount > 0
+                ? [
+                    const Color(0xFFFF7878),
+                    AppColors.primarycolor.withValues(alpha: 0.8),
+                  ]
+                : [const Color(0xFF10B981), const Color(0xFF059669)],
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                // Icon with animation
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    newReturnsCount > 0
+                        ? Icons.assignment_return_rounded
+                        : Icons.local_shipping_rounded,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Title
+                Text(
+                  'New Assignment${totalNew > 1 ? 's' : ''}!',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                // Message
+                Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                // Action button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Get.back();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: newReturnsCount > 0
+                          ? AppColors.primarycolor
+                          : const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Got it',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+    );
+    _isShowingNotificationBottomSheet = false;
   }
 
   void _setupScrollListeners() {
@@ -142,6 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  @override
   void dispose() {
     _pollingTimer?.cancel();
     _pollingTimer = null;
@@ -166,11 +363,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _fetchOrders({bool loadMore = false, bool silent = false}) async {
+  Future<void> _fetchOrders({
+    bool loadMore = false,
+    bool silent = false,
+  }) async {
     if (loadMore) {
       setState(() => _loadingMore = true);
-    } else if (!silent) {
-      // Only show loading spinners on non-silent (manual / initial) fetches
+    } else if (silent) {
+      // Silent auto-refresh: reset page but skip loading spinners so screen doesn't flash
+      _currentPage = 1;
+    } else {
+      // Show loading spinners only on manual / initial fetches
       setState(() {
         _ordersLoading = true;
         _ordersError = null;
@@ -186,8 +389,9 @@ class _HomeScreenState extends State<HomeScreen> {
       OrderRepo.getDeliveryOrders(page: _currentPage, limit: _pageSize)
           .then((orders) {
             if (mounted) {
-              // Check for new orders and notify rider using HomeController (only on initial fetch, not loadMore)
-              if (!loadMore && Get.isRegistered<HomeController>()) {
+              // Check for new orders and notify rider using HomeController
+              // Skip notification on silent refresh — it was already shown by _silentRefreshIncoming
+              if (!loadMore && !silent && Get.isRegistered<HomeController>()) {
                 final controller = Get.find<HomeController>();
                 controller.checkForNewOrders(
                   orders,
@@ -230,7 +434,8 @@ class _HomeScreenState extends State<HomeScreen> {
             );
 
             // Check for new returns and show bottom sheet using HomeController
-            if (!loadMore && Get.isRegistered<HomeController>()) {
+            // Skip notification on silent refresh — it was already shown by _silentRefreshIncoming
+            if (!loadMore && !silent && Get.isRegistered<HomeController>()) {
               final controller = Get.find<HomeController>();
               await controller.checkForNewReturns(detailedReturns);
             }
@@ -353,6 +558,13 @@ class _HomeScreenState extends State<HomeScreen> {
             _returnOrders.add(r);
           }
         }
+
+        // --- Automatically increase visible counts to show all orders ---
+        // This ensures old orders remain visible and new orders are shown without hiding old ones
+        _visibleNewCount = _newOrders.length + _inTransitOrders.length;
+        _visibleHistoryCount =
+            _historyOrders.length + _historyReturnOrders.length;
+        _visibleReturnCount = _activeReturnOrders.length;
       });
     }
   }
