@@ -14,6 +14,7 @@ class HomeController extends GetxController {
   // Navigation state
   final selectedIndex = 0.obs;
   final isOnline = true.obs;
+  bool _isShowingNotificationBottomSheet = false;
 
   // Tab state: 0=New, 1=In Transit, 2=Returns, 3=History
   final selectedTab = 0.obs;
@@ -56,6 +57,9 @@ class HomeController extends GetxController {
   final historyScrollController = ScrollController();
   final returnScrollController = ScrollController();
 
+  // Auto-polling: disabled — new-assignment check runs only once on initial load
+  // via checkForNewOrders / checkForNewReturns inside fetchOrders().
+
   // Search state
   final searchQuery = ''.obs;
   final searchController = TextEditingController();
@@ -90,14 +94,16 @@ class HomeController extends GetxController {
     'return_completed',
   };
 
+  @override
   void onInit() {
     super.onInit();
     loadUserData();
     fetchOnlineStatus();
-    fetchOrders();
+    fetchOrders(); // check for new orders/returns runs once here on startup
     setupScrollListeners();
   }
 
+  @override
   void onClose() {
     deliveryScrollController.dispose();
     historyScrollController.dispose();
@@ -222,6 +228,15 @@ class HomeController extends GetxController {
 
     _calculateLocalStats();
     _mergeRefundRequestedOrders();
+
+    // Check for new assignments at the very end of the initial fetch (loadMore is false)
+    if (!loadMore) {
+      // 1. Check for new orders
+      await checkForNewOrders(allOrders);
+
+      // 2. Check for new returns (since _mergeRefundRequestedOrders has already merged refund requested orders into returnOrders)
+      await checkForNewReturns(returnOrders);
+    }
   }
 
   Future<void> _fetchDeliveryOrders(bool loadMore) async {
@@ -230,11 +245,6 @@ class HomeController extends GetxController {
         page: currentPage.value,
         limit: pageSize,
       );
-
-      // Check for new orders and notify rider
-      if (!loadMore) {
-        await checkForNewOrders(orders);
-      }
 
       if (loadMore) {
         allOrders.addAll(orders);
@@ -248,9 +258,11 @@ class HomeController extends GetxController {
   }
 
   /// Check for newly assigned orders and show notification
-  Future<void> checkForNewOrders(
+  /// Returns the count of new orders
+  Future<int> checkForNewOrders(
     List<DeliveryOrder> newOrders, {
     List<DeliveryOrder>? existingOrders,
+    bool skipNotification = false,
   }) async {
     // Get existing order IDs from storage (not from current state)
     final lastKnownOrderIds = await StorageService.getLastKnownOrderIds();
@@ -264,10 +276,33 @@ class HomeController extends GetxController {
       return isNewOrder && isPreviouslyUnknown;
     }).toList();
 
-    // Show notification if there are new orders
-    if (newlyAssignedOrders.isNotEmpty) {
-      final count = newlyAssignedOrders.length;
-      await Get.bottomSheet(
+    debugPrint('=== checkForNewOrders Debug ===');
+    debugPrint('Total new orders to check: ${newOrders.length}');
+    debugPrint('Newly assigned orders: ${newlyAssignedOrders.length}');
+
+    if (newlyAssignedOrders.isEmpty) {
+      return 0;
+    }
+
+    if (skipNotification) {
+      // Just return the count, do NOT save to storage yet.
+      return newlyAssignedOrders.length;
+    }
+
+    // Show notification if there are new orders and no bottom sheet is currently open
+    if (_isShowingNotificationBottomSheet || Get.isBottomSheetOpen == true) {
+      debugPrint('A bottom sheet is already open or opening. Skipping showing new orders notification.');
+      return newlyAssignedOrders.length;
+    }
+
+    // Save updated order IDs to storage immediately since we are displaying the bottom sheet
+    final allCurrentOrderIds = newOrders.map((o) => o.id).toList();
+    final updatedOrderIds = {...existingOrderIdsSet, ...allCurrentOrderIds}.toList();
+    await StorageService.saveLastKnownOrderIds(updatedOrderIds);
+
+    _isShowingNotificationBottomSheet = true;
+    final count = newlyAssignedOrders.length;
+    await Get.bottomSheet(
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -322,8 +357,8 @@ class HomeController extends GetxController {
                   // Message
                   Text(
                     count == 1
-                        ? 'You have a new delivery order:\n${newlyAssignedOrders.first.orderId}'
-                        : 'You have $count new delivery orders\nready for delivery',
+                        ? 'You have a new delivery order assigned\nready for delivery'
+                        : 'You have $count new delivery orders assigned\nready for delivery',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
@@ -369,47 +404,69 @@ class HomeController extends GetxController {
         enableDrag: true,
         backgroundColor: Colors.transparent,
       );
-
-      // Save updated order IDs to storage after showing notification
-      final allCurrentOrderIds = newOrders.map((o) => o.id).toList();
-      await StorageService.saveLastKnownOrderIds(allCurrentOrderIds);
-    } else {
-      // Even if no new orders, update storage with current order IDs
-      // to keep the stored list in sync
-      final allCurrentOrderIds = newOrders.map((o) => o.id).toList();
-      await StorageService.saveLastKnownOrderIds(allCurrentOrderIds);
-    }
+      _isShowingNotificationBottomSheet = false;
+      return newlyAssignedOrders.length;
   }
 
-  Future<void> checkForNewReturns(List<ReturnOrder> newReturns) async {
+  /// Check for newly assigned returns and show notification
+  /// Returns the count of new returns
+  Future<int> checkForNewReturns(
+    List<ReturnOrder> newReturns, {
+    bool skipNotification = false,
+  }) async {
     // Get existing return IDs from storage
     final lastKnownReturnIds = await StorageService.getLastKnownReturnIds();
     final existingReturnIdsSet = lastKnownReturnIds.toSet();
 
-    debugPrint('=== checkForNewReturns Debug ===');
-    debugPrint('Total new returns: ${newReturns.length}');
-    debugPrint('Last known return IDs from storage: $lastKnownReturnIds');
-
-    // Find returns that weren't in the previous list
+    // Find returns that weren't in the previous list and are active (not completed/cancelled/history)
     final newlyAssignedReturns = newReturns.where((returnOrder) {
-      final isPreviouslyUnknown = !existingReturnIdsSet.contains(
-        returnOrder.id,
-      );
+      final status = returnOrder.orderStatus.toLowerCase();
+      
+      // Filter out completed/cancelled/history returns
+      final isHistory = historyStatuses.contains(status) ||
+                        returnOrder.replacementDeliveryStatus?.toLowerCase() == 'completed' ||
+                        returnOrder.replacementDeliveryStatus?.toLowerCase() == 'delivered' ||
+                        returnOrder.returnItemStatus?.toLowerCase() == 'rejected_dropped';
+
+      final isPreviouslyUnknown = !existingReturnIdsSet.contains(returnOrder.id);
+      
       debugPrint(
         'Return ${returnOrder.returnId} (id: ${returnOrder.id}): '
         'isPreviouslyUnknown=$isPreviouslyUnknown, '
+        'isHistory=$isHistory, '
         'isFromWarehouse=${returnOrder.isFromWarehouse}',
       );
-      return isPreviouslyUnknown;
+      return !isHistory && isPreviouslyUnknown;
     }).toList();
 
+    debugPrint('=== checkForNewReturns Debug ===');
+    debugPrint('Total returns to check: ${newReturns.length}');
     debugPrint('Newly assigned returns: ${newlyAssignedReturns.length}');
 
-    // Show notification if there are new returns
-    if (newlyAssignedReturns.isNotEmpty) {
-      final count = newlyAssignedReturns.length;
-      debugPrint('Showing bottom sheet for $count new returns');
-      await Get.bottomSheet(
+    if (newlyAssignedReturns.isEmpty) {
+      return 0;
+    }
+
+    if (skipNotification) {
+      // Just return the count, do NOT save to storage yet.
+      return newlyAssignedReturns.length;
+    }
+
+    // Show notification if no bottom sheet is currently open
+    if (_isShowingNotificationBottomSheet || Get.isBottomSheetOpen == true) {
+      debugPrint('A bottom sheet is already open or opening. Skipping showing new returns notification.');
+      return newlyAssignedReturns.length;
+    }
+
+    // Save updated return IDs to storage immediately since we are displaying the bottom sheet
+    final allCurrentReturnIds = newReturns.map((r) => r.id).toList();
+    final updatedReturnIds = {...existingReturnIdsSet, ...allCurrentReturnIds}.toList();
+    await StorageService.saveLastKnownReturnIds(updatedReturnIds);
+
+    _isShowingNotificationBottomSheet = true;
+    final count = newlyAssignedReturns.length;
+    debugPrint('Showing bottom sheet for $count new returns');
+    await Get.bottomSheet(
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -467,8 +524,8 @@ class HomeController extends GetxController {
                   // Message
                   Text(
                     count == 1
-                        ? 'You have a new return request:\n${newlyAssignedReturns.first.returnId}'
-                        : 'You have $count new return requests\nready for processing',
+                        ? 'You have a new return request assigned\nready for processing'
+                        : 'You have $count new return requests assigned\nready for processing',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
@@ -515,16 +572,8 @@ class HomeController extends GetxController {
         enableDrag: true,
         backgroundColor: Colors.transparent,
       );
-
-      // Save updated return IDs to storage after showing notification
-      final allCurrentReturnIds = newReturns.map((r) => r.id).toList();
-      await StorageService.saveLastKnownReturnIds(allCurrentReturnIds);
-    } else {
-      // Even if no new returns, update storage with current return IDs
-      // to keep the stored list in sync
-      final allCurrentReturnIds = newReturns.map((r) => r.id).toList();
-      await StorageService.saveLastKnownReturnIds(allCurrentReturnIds);
-    }
+      _isShowingNotificationBottomSheet = false;
+      return newlyAssignedReturns.length;
   }
 
   Future<void> _fetchReturnOrders(bool loadMore) async {
@@ -562,8 +611,6 @@ class HomeController extends GetxController {
         returnOrders.addAll(detailedReturns);
       } else {
         returnOrders.assignAll(detailedReturns);
-        // Check for new returns only on initial load, not on load more
-        await checkForNewReturns(detailedReturns);
       }
       hasMoreReturns.value = detailedReturns.length >= pageSize;
     } catch (e) {
