@@ -93,7 +93,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  @override
   void initState() {
     super.initState();
     _loadUserData();
@@ -189,7 +188,8 @@ class _HomeScreenState extends State<HomeScreen> {
       // 3. If any new details arrived, show single combined bottomsheet and auto-refresh
       if ((newOrdersCount > 0 || newReturnsCount > 0) && mounted) {
         // If a bottom sheet is already open, skip showing combined notification and do NOT write to storage yet
-        if (_isShowingNotificationBottomSheet || Get.isBottomSheetOpen == true) {
+        if (_isShowingNotificationBottomSheet ||
+            Get.isBottomSheetOpen == true) {
           debugPrint(
             'A bottom sheet is already open or opening. Skipping combined notification, will retry next poll.',
           );
@@ -199,13 +199,21 @@ class _HomeScreenState extends State<HomeScreen> {
         // Save updated order IDs to storage immediately since we are displaying the bottom sheet
         final allCurrentOrderIds = orders.map((o) => o.id).toList();
         final lastKnownOrderIds = await StorageService.getLastKnownOrderIds();
-        final updatedOrderIds = {...lastKnownOrderIds, ...allCurrentOrderIds}.toList();
+        final updatedOrderIds = {
+          ...lastKnownOrderIds,
+          ...allCurrentOrderIds,
+        }.toList();
         await StorageService.saveLastKnownOrderIds(updatedOrderIds);
-        
+
         // Save updated return IDs to storage immediately since we are displaying the bottom sheet
-        final allCurrentReturnIds = allDetailedReturns.map((r) => r.id).toList();
+        final allCurrentReturnIds = allDetailedReturns
+            .map((r) => r.id)
+            .toList();
         final lastKnownReturnIds = await StorageService.getLastKnownReturnIds();
-        final updatedReturnIds = {...lastKnownReturnIds, ...allCurrentReturnIds}.toList();
+        final updatedReturnIds = {
+          ...lastKnownReturnIds,
+          ...allCurrentReturnIds,
+        }.toList();
         await StorageService.saveLastKnownReturnIds(updatedReturnIds);
 
         debugPrint(
@@ -382,7 +390,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  @override
   void dispose() {
     _pollingTimer?.cancel();
     _pollingTimer = null;

@@ -94,7 +94,6 @@ class HomeController extends GetxController {
     'return_completed',
   };
 
-  @override
   void onInit() {
     super.onInit();
     loadUserData();
@@ -103,7 +102,6 @@ class HomeController extends GetxController {
     setupScrollListeners();
   }
 
-  @override
   void onClose() {
     deliveryScrollController.dispose();
     historyScrollController.dispose();
@@ -291,121 +289,126 @@ class HomeController extends GetxController {
 
     // Show notification if there are new orders and no bottom sheet is currently open
     if (_isShowingNotificationBottomSheet || Get.isBottomSheetOpen == true) {
-      debugPrint('A bottom sheet is already open or opening. Skipping showing new orders notification.');
+      debugPrint(
+        'A bottom sheet is already open or opening. Skipping showing new orders notification.',
+      );
       return newlyAssignedOrders.length;
     }
 
     // Save updated order IDs to storage immediately since we are displaying the bottom sheet
     final allCurrentOrderIds = newOrders.map((o) => o.id).toList();
-    final updatedOrderIds = {...existingOrderIdsSet, ...allCurrentOrderIds}.toList();
+    final updatedOrderIds = {
+      ...existingOrderIdsSet,
+      ...allCurrentOrderIds,
+    }.toList();
     await StorageService.saveLastKnownOrderIds(updatedOrderIds);
 
     _isShowingNotificationBottomSheet = true;
     final count = newlyAssignedOrders.length;
     await Get.bottomSheet(
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF10B981), Color(0xFF059669)],
-            ),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF10B981), Color(0xFF059669)],
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Handle bar
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 24),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  // Icon with animation
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.local_shipping_rounded,
-                      color: Colors.white,
-                      size: 48,
-                    ),
+                ),
+                // Icon with animation
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 20),
-                  // Title
-                  Text(
-                    'New Order${count > 1 ? 's' : ''} Assigned!',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: const Icon(
+                    Icons.local_shipping_rounded,
+                    color: Colors.white,
+                    size: 48,
                   ),
-                  const SizedBox(height: 12),
-                  // Message
-                  Text(
-                    count == 1
-                        ? 'You have a new delivery order assigned\nready for delivery'
-                        : 'You have $count new delivery orders assigned\nready for delivery',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.white,
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                // Title
+                Text(
+                  'New Order${count > 1 ? 's' : ''} Assigned!',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
                   ),
-                  const SizedBox(height: 24),
-                  // Action button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Get.back();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF10B981),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                // Message
+                Text(
+                  count == 1
+                      ? 'You have a new delivery order assigned\nready for delivery'
+                      : 'You have $count new delivery orders assigned\nready for delivery',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                // Action button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Get.back();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF10B981),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Text(
-                        'Got it',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Got it',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
           ),
         ),
-        isDismissible: true,
-        enableDrag: true,
-        backgroundColor: Colors.transparent,
-      );
-      _isShowingNotificationBottomSheet = false;
-      return newlyAssignedOrders.length;
+      ),
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+    );
+    _isShowingNotificationBottomSheet = false;
+    return newlyAssignedOrders.length;
   }
 
   /// Check for newly assigned returns and show notification
@@ -421,15 +424,18 @@ class HomeController extends GetxController {
     // Find returns that weren't in the previous list and are active (not completed/cancelled/history)
     final newlyAssignedReturns = newReturns.where((returnOrder) {
       final status = returnOrder.orderStatus.toLowerCase();
-      
-      // Filter out completed/cancelled/history returns
-      final isHistory = historyStatuses.contains(status) ||
-                        returnOrder.replacementDeliveryStatus?.toLowerCase() == 'completed' ||
-                        returnOrder.replacementDeliveryStatus?.toLowerCase() == 'delivered' ||
-                        returnOrder.returnItemStatus?.toLowerCase() == 'rejected_dropped';
 
-      final isPreviouslyUnknown = !existingReturnIdsSet.contains(returnOrder.id);
-      
+      // Filter out completed/cancelled/history returns
+      final isHistory =
+          historyStatuses.contains(status) ||
+          returnOrder.replacementDeliveryStatus?.toLowerCase() == 'completed' ||
+          returnOrder.replacementDeliveryStatus?.toLowerCase() == 'delivered' ||
+          returnOrder.returnItemStatus?.toLowerCase() == 'rejected_dropped';
+
+      final isPreviouslyUnknown = !existingReturnIdsSet.contains(
+        returnOrder.id,
+      );
+
       debugPrint(
         'Return ${returnOrder.returnId} (id: ${returnOrder.id}): '
         'isPreviouslyUnknown=$isPreviouslyUnknown, '
@@ -454,126 +460,131 @@ class HomeController extends GetxController {
 
     // Show notification if no bottom sheet is currently open
     if (_isShowingNotificationBottomSheet || Get.isBottomSheetOpen == true) {
-      debugPrint('A bottom sheet is already open or opening. Skipping showing new returns notification.');
+      debugPrint(
+        'A bottom sheet is already open or opening. Skipping showing new returns notification.',
+      );
       return newlyAssignedReturns.length;
     }
 
     // Save updated return IDs to storage immediately since we are displaying the bottom sheet
     final allCurrentReturnIds = newReturns.map((r) => r.id).toList();
-    final updatedReturnIds = {...existingReturnIdsSet, ...allCurrentReturnIds}.toList();
+    final updatedReturnIds = {
+      ...existingReturnIdsSet,
+      ...allCurrentReturnIds,
+    }.toList();
     await StorageService.saveLastKnownReturnIds(updatedReturnIds);
 
     _isShowingNotificationBottomSheet = true;
     final count = newlyAssignedReturns.length;
     debugPrint('Showing bottom sheet for $count new returns');
     await Get.bottomSheet(
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color.fromARGB(255, 255, 120, 120),
-                AppColors.primarycolor.withValues(alpha: 0.8),
-              ],
-            ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color.fromARGB(255, 255, 120, 120),
+              AppColors.primarycolor.withValues(alpha: 0.8),
+            ],
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Handle bar
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 24),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  // Icon with animation
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.assignment_return_rounded,
-                      color: Colors.white,
-                      size: 48,
-                    ),
+                ),
+                // Icon with animation
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 20),
-                  // Title
-                  Text(
-                    'New Return${count > 1 ? 's' : ''} Assigned!',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: const Icon(
+                    Icons.assignment_return_rounded,
+                    color: Colors.white,
+                    size: 48,
                   ),
-                  const SizedBox(height: 12),
-                  // Message
-                  Text(
-                    count == 1
-                        ? 'You have a new return request assigned\nready for processing'
-                        : 'You have $count new return requests assigned\nready for processing',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.white,
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                // Title
+                Text(
+                  'New Return${count > 1 ? 's' : ''} Assigned!',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
                   ),
-                  const SizedBox(height: 24),
-                  // Action button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Get.back();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppColors.primarycolor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                // Message
+                Text(
+                  count == 1
+                      ? 'You have a new return request assigned\nready for processing'
+                      : 'You have $count new return requests assigned\nready for processing',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                // Action button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Get.back();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.primarycolor,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Text(
-                        'Got it',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                          color: Colors.black,
-                        ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Got it',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                        color: Colors.black,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
           ),
         ),
-        isDismissible: true,
-        enableDrag: true,
-        backgroundColor: Colors.transparent,
-      );
-      _isShowingNotificationBottomSheet = false;
-      return newlyAssignedReturns.length;
+      ),
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+    );
+    _isShowingNotificationBottomSheet = false;
+    return newlyAssignedReturns.length;
   }
 
   Future<void> _fetchReturnOrders(bool loadMore) async {
