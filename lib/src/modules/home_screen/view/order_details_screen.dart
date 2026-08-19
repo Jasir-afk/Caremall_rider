@@ -22,6 +22,7 @@ class OrderDetailsScreen extends StatefulWidget {
   final DeliveryOrder order;
   const OrderDetailsScreen({super.key, required this.order});
 
+  @override
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
 }
 
@@ -38,6 +39,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   bool _updatingStatus = false;
   File? _uploadedPhotoFile; // Stores the uploaded photo file for preview
 
+  @override
   void initState() {
     super.initState();
     _fetchDetail();
@@ -560,6 +562,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,

@@ -343,11 +343,10 @@ class OrderRepo {
       },
       body: jsonEncode({
         'status': status,
-        if (reason != null) 'reason': reason,
-        if (isUndelivered != null) 'isUndelivered': isUndelivered,
-        if (undeliveredWarehouseDrop != null)
-          'undeliveredWarehouseDrop': undeliveredWarehouseDrop,
-        if (note != null) 'note': note,
+        'reason': ?reason,
+        'isUndelivered': ?isUndelivered,
+        'undeliveredWarehouseDrop': ?undeliveredWarehouseDrop,
+        'note': ?note,
       }),
     );
 
@@ -640,14 +639,13 @@ class OrderRepo {
       },
       body: jsonEncode({
         'returnItemStatus': returnItemStatus,
-        if (orderStatus != null) 'status': orderStatus,
-        if (pickStatus != null) 'pickStatus': pickStatus,
-        if (pickupStatus != null) 'pickupStatus': pickupStatus,
-        if (refundStatus != null) 'refundStatus': refundStatus,
-        if (replacementDeliveryStatus != null)
-          'replacementDeliveryStatus': replacementDeliveryStatus,
-        if (isPicked != null) 'isPicked': isPicked,
-        if (isDropped != null) 'isDropped': isDropped,
+        'status': ?orderStatus,
+        'pickStatus': ?pickStatus,
+        'pickupStatus': ?pickupStatus,
+        'refundStatus': ?refundStatus,
+        'replacementDeliveryStatus': ?replacementDeliveryStatus,
+        'isPicked': ?isPicked,
+        'isDropped': ?isDropped,
       }),
     );
 
@@ -738,8 +736,8 @@ class OrderRepo {
       },
       body: jsonEncode({
         'replacementDeliveryStatus': replacementDeliveryStatus,
-        if (orderStatus != null) 'status': orderStatus,
-        if (pickupStatus != null) 'pickupStatus': pickupStatus,
+        'status': ?orderStatus,
+        'pickupStatus': ?pickupStatus,
       }),
     );
 

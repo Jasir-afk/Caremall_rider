@@ -46,6 +46,7 @@ class Log {
 }
 
 class ProductionFilter extends LogFilter {
+  @override
   bool shouldLog(LogEvent event) {
     if (kReleaseMode) {
       // Only log errors in release mode (this depends on if you're using a console log in production)

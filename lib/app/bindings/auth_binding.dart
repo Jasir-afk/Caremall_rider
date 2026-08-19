@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 /// AuthBinding injects AuthController for authentication-related screens
 class AuthBinding extends Bindings {
+  @override
   void dependencies() {
     Get.lazyPut<AuthController>(() => AuthController());
   }

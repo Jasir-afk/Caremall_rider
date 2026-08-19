@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 /// HomeBinding injects HomeController for home-related screens
 class HomeBinding extends Bindings {
+  @override
   void dependencies() {
     Get.lazyPut<HomeController>(() => HomeController());
   }

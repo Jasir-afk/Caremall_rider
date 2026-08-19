@@ -36,11 +36,13 @@ class KYCController extends GetxController {
   final upiId = TextEditingController();
   final upiNumber = TextEditingController();
 
+  @override
   void onInit() {
     super.onInit();
     fetchKycStatus();
   }
 
+  @override
   void onClose() {
     registrationNumber.dispose();
     licenseNumber.dispose();

@@ -10,6 +10,7 @@ class ConnectivityService extends GetxService {
   // Track state to avoid redundant snackbars
   bool _wasOffline = false;
 
+  @override
   void onInit() {
     super.onInit();
     _checkInitialStatus();
@@ -57,6 +58,7 @@ class ConnectivityService extends GetxService {
     }
   }
 
+  @override
   void onClose() {
     _subscription.cancel();
     super.onClose();

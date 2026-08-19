@@ -15,6 +15,7 @@ import 'package:care_mall_rider/app/utils/kyc_storage.dart';
 class VehicleSelectionScreen extends StatefulWidget {
   const VehicleSelectionScreen({super.key});
 
+  @override
   State<VehicleSelectionScreen> createState() => _VehicleSelectionScreenState();
 }
 
@@ -79,11 +80,13 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     ),
   ];
 
+  @override
   void initState() {
     super.initState();
     _registrationController.addListener(() => setState(() {}));
   }
 
+  @override
   void dispose() {
     _registrationController.dispose();
     super.dispose();
@@ -201,6 +204,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     }
   }
 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -389,6 +393,7 @@ class _VehicleCard extends StatelessWidget {
     required this.onTap,
   });
 
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
@@ -480,6 +485,7 @@ class _Tag extends StatelessWidget {
     required this.textColor,
   });
 
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
@@ -504,6 +510,7 @@ class _StepProgressBar extends StatelessWidget {
 
   const _StepProgressBar({required this.currentStep, required this.totalSteps});
 
+  @override
   Widget build(BuildContext context) {
     List<Widget> children = [];
 
@@ -580,6 +587,7 @@ class _InputField extends StatelessWidget {
     this.textCapitalization = TextCapitalization.none,
   });
 
+  @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
@@ -623,6 +631,7 @@ class _InputField extends StatelessWidget {
 
 // ─── Upper Case Formatter ──────────────────────────────────────────────────────
 class _UpperCaseFormatter extends TextInputFormatter {
+  @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,

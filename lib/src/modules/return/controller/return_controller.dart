@@ -19,6 +19,7 @@ class ReturnController extends GetxController {
   // Selected photo for upload
   final selectedPhoto = Rxn<File>();
 
+  @override
   void onInit() {
     super.onInit();
     fetchReturnOrders();
@@ -341,6 +342,7 @@ class ReturnController extends GetxController {
   }
 
   /// Refresh all return orders
+  @override
   Future<void> refresh() async {
     await fetchReturnOrders();
   }

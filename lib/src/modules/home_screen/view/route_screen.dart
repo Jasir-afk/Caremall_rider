@@ -448,12 +448,14 @@ Future<TodayRoute> fetchTodayRoute({
 class RouteScreen extends StatefulWidget {
   const RouteScreen({super.key});
 
+  @override
   State<RouteScreen> createState() => _RouteScreenState();
 }
 
 class _RouteScreenState extends State<RouteScreen> {
   late Future<TodayRoute> _routeFuture;
 
+  @override
   void initState() {
     super.initState();
     _routeFuture = fetchTodayRoute();
@@ -466,6 +468,7 @@ class _RouteScreenState extends State<RouteScreen> {
     await _routeFuture;
   }
 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -536,6 +539,7 @@ class _RouteBody extends StatelessWidget {
 
   const _RouteBody({required this.route, required this.onRefresh});
 
+  @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
@@ -629,6 +633,7 @@ class _SummaryCard extends StatelessWidget {
 
   const _SummaryCard({required this.route});
 
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(16.w),
@@ -672,6 +677,7 @@ class _StatChip extends StatelessWidget {
 
   const _StatChip({required this.icon, required this.label});
 
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
@@ -744,6 +750,7 @@ class _StopCard extends StatelessWidget {
     }
   }
 
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {

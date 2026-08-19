@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 /// ProfileBinding injects ProfileController for profile-related screens
 class ProfileBinding extends Bindings {
+  @override
   void dependencies() {
     Get.lazyPut<ProfileController>(() => ProfileController());
   }

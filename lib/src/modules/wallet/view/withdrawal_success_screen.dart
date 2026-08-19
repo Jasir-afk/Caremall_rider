@@ -12,6 +12,7 @@ class WithdrawalSuccessScreen extends StatefulWidget {
   final num amount;
   const WithdrawalSuccessScreen({super.key, required this.amount});
 
+  @override
   State<WithdrawalSuccessScreen> createState() =>
       _WithdrawalSuccessScreenState();
 }
@@ -31,6 +32,7 @@ class _WithdrawalSuccessScreenState extends State<WithdrawalSuccessScreen>
   Future<RiderProfile>? _profileFuture;
   final AudioPlayer _audioPlayer = AudioPlayer();
 
+  @override
   void initState() {
     super.initState();
     _profileFuture = ProfileRepo.getProfile().then((json) {
@@ -96,6 +98,7 @@ class _WithdrawalSuccessScreenState extends State<WithdrawalSuccessScreen>
     await _cardController.forward();
   }
 
+  @override
   void dispose() {
     _iconController.dispose();
     _cardController.dispose();
@@ -103,6 +106,7 @@ class _WithdrawalSuccessScreenState extends State<WithdrawalSuccessScreen>
     super.dispose();
   }
 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121418), // Deep rich dark background
@@ -432,6 +436,7 @@ class _WithdrawalSuccessScreenState extends State<WithdrawalSuccessScreen>
 class _DashedDivider extends StatelessWidget {
   const _DashedDivider();
 
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 1.h,
@@ -442,6 +447,7 @@ class _DashedDivider extends StatelessWidget {
 }
 
 class _DashedLinePainter extends CustomPainter {
+  @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = const Color(0xFFE0E0E0)
@@ -458,6 +464,7 @@ class _DashedLinePainter extends CustomPainter {
     }
   }
 
+  @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
@@ -465,6 +472,7 @@ class _PremiumCheckPainter extends CustomPainter {
   final double progress;
   _PremiumCheckPainter(this.progress);
 
+  @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = Colors.white
@@ -487,5 +495,6 @@ class _PremiumCheckPainter extends CustomPainter {
     canvas.drawPath(extractPath, paint);
   }
 
+  @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
