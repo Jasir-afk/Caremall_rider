@@ -15,6 +15,7 @@ class ReturnDetailsScreen extends StatefulWidget {
 
   const ReturnDetailsScreen({super.key, required this.returnOrder});
 
+  @override
   State<ReturnDetailsScreen> createState() => _ReturnDetailsScreenState();
 }
 
@@ -45,6 +46,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
   static const Color _red = Color(0xFFE53935);
   static const Color _blue = Color(0xFF1565C0);
 
+  @override
   void initState() {
     super.initState();
     _fadeCtrl = AnimationController(
@@ -162,6 +164,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
     return true;
   }
 
+  @override
   void dispose() {
     _fadeCtrl.dispose();
     super.dispose();
@@ -413,6 +416,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
+  @override
   Widget build(BuildContext context) {
     final isReplacement =
         (_detail?.returnType?.toLowerCase() == 'replacement' ||
@@ -620,7 +624,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -832,7 +836,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -1167,7 +1171,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
+                      color: Colors.black.withValues(alpha: 0.06),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -1287,7 +1291,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primarycolor.withOpacity(0.28),
+            color: AppColors.primarycolor.withValues(alpha: 0.28),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -1324,7 +1328,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
             width: 48.w,
             height: 48.w,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -1422,7 +1426,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         color: _surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withValues(alpha: 0.07),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -1488,8 +1492,8 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primarycolor,
-                  disabledBackgroundColor: AppColors.primarycolor.withOpacity(
-                    0.3,
+                  disabledBackgroundColor: AppColors.primarycolor.withValues(
+                    alpha: 0.3,
                   ),
                   foregroundColor: Colors.white,
                   elevation: 0,
@@ -1710,7 +1714,7 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -1837,8 +1841,8 @@ class _ReturnDetailsScreenState extends State<ReturnDetailsScreen>
         padding: EdgeInsets.symmetric(vertical: 11.h),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10.r),
-          border: Border.all(color: color.withOpacity(0.25)),
-          color: color.withOpacity(0.04),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+          color: color.withValues(alpha: 0.04),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

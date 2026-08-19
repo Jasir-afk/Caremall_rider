@@ -39,11 +39,13 @@ class ProfileController extends GetxController {
   final selectedAvatar = Rxn<File>();
   final removeAvatar = false.obs;
 
+  @override
   void onInit() {
     super.onInit();
     fetchProfile();
   }
 
+  @override
   void onClose() {
     nameController.dispose();
     emailController.dispose();

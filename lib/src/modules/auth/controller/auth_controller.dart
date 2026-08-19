@@ -20,6 +20,7 @@ class AuthController extends GetxController {
   final authToken = ''.obs;
   final isOnline = false.obs;
 
+  @override
   void onInit() {
     super.onInit();
     // Restore authentication state from persistent storage on startup

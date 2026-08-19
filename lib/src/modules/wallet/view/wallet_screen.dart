@@ -10,12 +10,14 @@ import 'package:intl/intl.dart';
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
 
+  @override
   State<WalletScreen> createState() => _WalletScreenState();
 }
 
 class _WalletScreenState extends State<WalletScreen> {
   int _selectedTab = 0; // 0: Transactions, 1: Withdrawals
 
+  @override
   Widget build(BuildContext context) {
     final controller = Get.put(WalletController());
 
@@ -595,6 +597,7 @@ class _WithdrawBottomSheet extends StatefulWidget {
   });
 
 
+  @override
   State<_WithdrawBottomSheet> createState() => _WithdrawBottomSheetState();
 }
 
@@ -602,6 +605,7 @@ class _WithdrawBottomSheetState extends State<_WithdrawBottomSheet> {
   late final TextEditingController amountController;
   bool isSlideEnabled = false;
 
+  @override
   void initState() {
     super.initState();
     amountController = TextEditingController();
@@ -609,6 +613,7 @@ class _WithdrawBottomSheetState extends State<_WithdrawBottomSheet> {
   }
 
 
+  @override
   void dispose() {
     amountController.removeListener(_updateSlideState);
     amountController.dispose();
@@ -635,6 +640,7 @@ class _WithdrawBottomSheetState extends State<_WithdrawBottomSheet> {
   }
 
 
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(24.w),
@@ -797,6 +803,7 @@ class SlideToWithdraw extends StatefulWidget {
   });
 
 
+  @override
   State<SlideToWithdraw> createState() => _SlideToWithdrawState();
 }
 
@@ -804,6 +811,7 @@ class _SlideToWithdrawState extends State<SlideToWithdraw> {
   double _dragPosition = 0;
   bool _isFinished = false;
 
+  @override
   void didUpdateWidget(covariant SlideToWithdraw oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.enabled && oldWidget.enabled) {
@@ -813,6 +821,7 @@ class _SlideToWithdrawState extends State<SlideToWithdraw> {
     }
   }
 
+  @override
   Widget build(BuildContext context) {
     const double buttonHeight = 58.0;
     const double thumbSize = 46.0;

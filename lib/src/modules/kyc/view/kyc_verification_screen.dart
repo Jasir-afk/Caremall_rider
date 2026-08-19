@@ -11,12 +11,14 @@ import 'package:get/get.dart';
 class KycVerificationScreen extends StatefulWidget {
   const KycVerificationScreen({super.key});
 
+  @override
   State<KycVerificationScreen> createState() => _KycVerificationScreenState();
 }
 
 class _KycVerificationScreenState extends State<KycVerificationScreen> {
   late final KYCController _kycController;
 
+  @override
   void initState() {
     super.initState();
     _kycController = Get.find<KYCController>();
@@ -27,6 +29,7 @@ class _KycVerificationScreenState extends State<KycVerificationScreen> {
     Get.offAll(() => const HomeScreen());
   }
 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -199,6 +202,7 @@ class _KycHeader extends StatelessWidget {
 
   const _KycHeader({required this.status});
 
+  @override
   Widget build(BuildContext context) {
     String headerTitle = 'KYC Verification';
     String headerSubtitle = 'Complete your KYC to start delivering and earning';
@@ -291,6 +295,7 @@ class _KycStepCard extends StatelessWidget {
     required this.subtitle,
   });
 
+  @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,

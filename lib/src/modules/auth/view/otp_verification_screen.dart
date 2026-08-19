@@ -28,6 +28,7 @@ class OTPVerificationScreen extends StatefulWidget {
     this.email,
   });
 
+  @override
   State<OTPVerificationScreen> createState() => _OTPVerificationScreenState();
 }
 
@@ -41,6 +42,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   Timer? _timer;
   int _start = 30;
 
+  @override
   void initState() {
     super.initState();
     _authController = Get.find<AuthController>();
@@ -62,6 +64,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     });
   }
 
+  @override
   void dispose() {
     _timer?.cancel();
     for (var controller in _otpControllers) {
@@ -112,6 +115,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     Get.back();
   }
 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,

@@ -272,7 +272,7 @@ class ReturnOrder {
     return ReturnOrder(
       id: id,
       returnId: returnId,
-      orderId: orderId ?? this.orderId,
+      orderId: orderId ?? orderId,
       orderStatus: orderStatus ?? this.orderStatus,
       reason: reason,
       totalAmount: totalAmount ?? this.totalAmount,

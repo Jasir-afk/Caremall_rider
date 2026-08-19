@@ -23,6 +23,7 @@ import 'package:care_mall_rider/src/modules/wallet/view/wallet_screen.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
@@ -960,6 +961,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return true;
   }
 
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
@@ -1654,14 +1656,31 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final allReturns = _filterReturnOrders(_activeReturnOrders);
     if (allReturns.isEmpty) {
-      return Center(
-        child: AppText(
-          text: 'No active returns',
-          fontSize: 14.sp,
-          fontWeight: FontWeight.w500,
-          color: Colors.grey[500]!,
+return Center(
+  child: RefreshIndicator(
+    onRefresh: _fetchOrders,
+    child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: SizedBox(
+        height: 400.h,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: 12.h),
+              AppText(
+                text: 'No active returns',
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[600]!,
+              ),
+            ],
+          ),
         ),
-      );
+      ),
+    ),
+  ),
+);
     }
     final activeReturns = allReturns.take(_visibleReturnCount).toList();
     final bool showLoadMore =
@@ -2495,6 +2514,7 @@ class _AnimatedLoadMoreButton extends StatefulWidget {
     required this.onPressed,
   });
 
+  @override
   State<_AnimatedLoadMoreButton> createState() =>
       _AnimatedLoadMoreButtonState();
 }
@@ -2505,6 +2525,7 @@ class _AnimatedLoadMoreButtonState extends State<_AnimatedLoadMoreButton>
   late final Animation<double> _fade;
   late final Animation<Offset> _slide;
 
+  @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
@@ -2522,11 +2543,13 @@ class _AnimatedLoadMoreButtonState extends State<_AnimatedLoadMoreButton>
     });
   }
 
+  @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
   }
 
+  @override
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _fade,

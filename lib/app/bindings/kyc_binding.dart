@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 /// KYCBinding injects KYCController for KYC verification screens
 class KYCBinding extends Bindings {
+  @override
   void dependencies() {
     Get.lazyPut<KYCController>(() => KYCController());
   }

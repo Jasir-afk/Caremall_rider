@@ -11,6 +11,7 @@ class CustomerReturnScreen extends StatefulWidget {
   final ReturnOrder returnOrder;
   const CustomerReturnScreen({super.key, required this.returnOrder});
 
+  @override
   State<CustomerReturnScreen> createState() => _CustomerReturnScreenState();
 }
 
@@ -23,6 +24,7 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
   bool _detailsConfirmed = false;
   String? _returnMethod; // 'picked' or 'dropped'
 
+  @override
   void initState() {
     super.initState();
     _initMethod();
@@ -65,6 +67,7 @@ class _CustomerReturnScreenState extends State<CustomerReturnScreen> {
 
   ReturnOrder get _display => _detail ?? widget.returnOrder;
 
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,

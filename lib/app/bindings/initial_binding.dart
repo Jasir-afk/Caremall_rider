@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 
 /// Application-wide bindings for shared controllers and services
 class InitialBinding extends Bindings {
+  @override
   void dependencies() {
     // Inject permanent global services
     Get.put(ConnectivityService(), permanent: true);
