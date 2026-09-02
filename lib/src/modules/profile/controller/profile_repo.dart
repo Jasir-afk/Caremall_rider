@@ -5,6 +5,7 @@ import 'package:care_mall_rider/app/utils/network/logger_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:care_mall_rider/app/utils/network/apiurls.dart';
 import 'package:care_mall_rider/app/utils/network/upload_repo.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileRepo {
   /// Fetch rider profile
@@ -12,8 +13,16 @@ class ProfileRepo {
     final token = await StorageService.getAuthToken();
     Log.debug('[ProfileRepo] Fetching profile from: ${ApiUrls.getProfile}');
     Log.debug('[ProfileRepo] Token exists: ${token != null}');
+    Log.debug('[ProfileRepo] Token value: ${token?.substring(0, 10)}...');
+
+    // Check login status
+    final isLoggedIn = await StorageService.isLoggedIn();
+    Log.debug('[ProfileRepo] Is logged in: $isLoggedIn');
 
     if (token == null) {
+      // Additional debugging
+      final prefs = await SharedPreferences.getInstance();
+      Log.debug('[ProfileRepo] SharedPreferences keys: ${prefs.getKeys()}');
       throw Exception('Authentication token not found. Please log in again.');
     }
 

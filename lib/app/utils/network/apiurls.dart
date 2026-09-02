@@ -3,7 +3,7 @@ class ApiUrls {
   //test
   static String baseURL = 'https://test.api.caremallonline.com';
   //Live
-  // static String baseURL = 'https://api.caremall.in';
+//   static String baseURL = 'https://api.caremall.in';
   // static const String baseURL = 'http://192.168.1.5:3000';
 
   // Auth
@@ -30,8 +30,7 @@ class ApiUrls {
       '$baseURL/api/v1/admin/upload/image'; // POST – upload image
 
   // Routes
-  static String get todayRoute =>
-      '$baseURL/api/v1/rider/routes/today'; // GET – today's route with ?lat=&lng=
+  static String get todayRoute => '$baseURL/api/v1/rider/routes/today'; // GET – today's route with ?lat=&lng=
   static String get routeDistance =>
       '$baseURL/api/v1/rider/routes/distance'; // GET – calculate route distance
 
